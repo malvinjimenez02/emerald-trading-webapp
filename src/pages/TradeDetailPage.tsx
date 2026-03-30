@@ -8,7 +8,7 @@ import { TradeForm } from '../components/trade/TradeForm';
 import type { Trade } from '../types/trade';
 import { TradeDirection, TradeResult, TradeStatus } from '../types/trade';
 import type { TradeFormData } from '../types/trade';
-import { formatCurrency, formatDate, formatDateTime } from '../utils/formatters';
+import { formatCurrency, formatDateTime } from '../utils/formatters';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -137,24 +137,22 @@ export const useJournalStore = create<JournalState>((set, get) => ({
 
     // Migrate orphan trades to the active journal (one-time, safe to repeat)
     // Case 1: mobile trades with no journal_id
-    const { error: m1, count: c1 } = await supabase
+    const { error: m1 } = await supabase
       .from('trades')
       .update({ journal_id: active.id })
       .eq('user_id', userId)
-      .is('journal_id', null)
-      .select('id', { count: 'exact', head: true });
+      .is('journal_id', null);
     if (m1) console.error('[migrate] null journal_id:', m1.message);
-    else console.log('[migrate] null → active:', c1);
+    else console.log('[migrate] null → active');
 
     // Case 2: trades saved with the fallback virtual journal (journal_id = userId)
-    const { error: m2, count: c2 } = await supabase
+    const { error: m2 } = await supabase
       .from('trades')
       .update({ journal_id: active.id })
       .eq('user_id', userId)
-      .eq('journal_id', userId)
-      .select('id', { count: 'exact', head: true });
+      .eq('journal_id', userId);
     if (m2) console.error('[migrate] fallback journal_id:', m2.message);
-    else console.log('[migrate] fallback → active:', c2);
+    else console.log('[migrate] fallback → active');
 
     await useTradeStore.getState().loadTrades(active.id);
   },

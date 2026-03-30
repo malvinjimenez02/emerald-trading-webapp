@@ -7,6 +7,7 @@ import { ActiveFilterBanner } from '../components/layout/ActiveFilterBanner';
 import { useTradeStore } from '../stores/useTradeStore';
 import { useJournalStore } from '../stores/useJournalStore';
 import { useDateFilterStore } from '../stores/useDateFilterStore';
+import type { Trade } from '../types/trade';
 import { TradeResult, TradeStatus } from '../types/trade';
 import { journalToConfig } from '../types/account';
 import { calculateMetrics } from '../utils/calculations';
@@ -14,7 +15,7 @@ import { formatCurrency, formatRelativeTime } from '../utils/formatters';
 
 // ─── Recent Trades mini-list ──────────────────────────────────────────────────
 
-const RecentTrades: React.FC<{ trades: ReturnType<typeof useTradeStore>['trades'] }> = ({ trades }) => {
+const RecentTrades: React.FC<{ trades: Trade[] }> = ({ trades }) => {
   const { isLoading } = useTradeStore();
   const navigate = useNavigate();
 
