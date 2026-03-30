@@ -10,10 +10,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Gem,
   LogOut,
   Check,
 } from 'lucide-react';
+import LogoIcon from '../../assets/Emerald-loading.svg';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useJournalStore } from '../../stores/useJournalStore';
 import { TradeForm } from '../trade/TradeForm';
@@ -132,16 +132,20 @@ export const Sidebar: React.FC = () => {
         </button>
       )}
       {/* Brand / Logo */}
-      {isCollapsed ? (
-        <div className="flex items-center justify-center h-16 border-b border-divider/50 shrink-0">
-          <Gem className="w-8 h-8 text-accent" />
+      <div className={`flex items-center h-16 border-b border-divider/50 shrink-0 transition-all ${isCollapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          <img 
+            src={LogoIcon} 
+            alt="Emerald" 
+            className="w-8 h-8 shrink-0 object-contain"
+          />
+          {!isCollapsed && (
+            <span className="text-[19px] font-[900] tracking-[-0.5px] text-white whitespace-nowrap">
+              EMERALD
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="flex items-center justify-between h-16 px-4 border-b border-divider/50 shrink-0">
-          <div className="flex items-center min-w-0">
-            <Gem className="w-8 h-8 text-accent shrink-0" />
-            <span className="ml-3 text-title2 tracking-wider text-text">EMERALD</span>
-          </div>
+        {!isCollapsed && (
           <button
             onClick={() => setIsCollapsed(true)}
             className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
@@ -149,8 +153,8 @@ export const Sidebar: React.FC = () => {
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Main Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-2">

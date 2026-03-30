@@ -1,5 +1,6 @@
 import React from 'react';
-import { Gem, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import EmeraldLogo from '../../assets/Emerald-login.svg';
 
 export const AuthSidebar: React.FC = () => {
   const steps = [
@@ -23,17 +24,16 @@ export const AuthSidebar: React.FC = () => {
   return (
     <div className="w-full h-full relative overflow-hidden rounded-[40px] bg-bg flex flex-col items-center justify-center p-8">
       {/* Dynamic Background Gradients mimicking the provided image */}
-      <div className="absolute inset-0 bg-gradient-to-b from-accent/30 via-bg to-accent/5 opacity-90" />
-      <div className="absolute top-0 right-0 w-3/4 h-1/2 bg-accent/20 blur-[100px] rounded-full" />
-      <div className="absolute -bottom-[15%] -left-[10%] w-full h-1/2 bg-accent/10 blur-[120px] rounded-full" />
+      <div className="absolute inset-0 bg-gradient-to-b from-accent/25 via-bg to-transparent opacity-90" />
+      <div className="absolute top-0 right-0 w-3/4 h-1/2 bg-accent/15 blur-[100px] rounded-full" />
+      <div className="absolute -bottom-[20%] -left-[15%] w-full h-2/3 bg-accent/5 blur-[140px] rounded-full" />
       <div className="absolute bottom-6 right-8 text-white/20">
         <Sparkles className="w-8 h-8" />
       </div>
 
       <div className="relative z-10 w-full max-w-[420px] pb-12">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <Gem className="w-9 h-9 text-accent fill-accent/40" />
-          <span className="text-[28px] font-bold text-white tracking-wide">Emerald Trade</span>
+        <div className="flex items-center justify-center gap-3 mb-10">
+          <img src={EmeraldLogo} alt="Emerald Trade" className="h-14 object-contain" />
         </div>
 
         <h2 className="text-[36px] font-bold text-white text-center leading-tight mb-3">
@@ -57,7 +57,7 @@ export const AuthSidebar: React.FC = () => {
                 </div>
 
                 {/* Card */}
-                <div className="bg-[#161B22]/50 border border-divider/40 rounded-[20px] p-5 flex-1 backdrop-blur-md transition-all hover:bg-bg-surface/80">
+                <div className="bg-[#1d232c]/70 border border-white/10 rounded-[20px] p-5 flex-1 backdrop-blur-xl transition-all hover:bg-bg-surface/90 hover:border-accent/30 group/card">
                   <h3 className="text-white text-[16px] font-semibold mb-1 flex items-center gap-2">
                     {step.icon} {step.title}
                   </h3>

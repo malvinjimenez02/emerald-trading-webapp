@@ -9,7 +9,7 @@ import { TradeDetailPage } from './pages/TradeDetailPage';
 import { AnalysisPage } from './pages/AnalysisPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useAuthStore } from './stores/useAuthStore';
-import { Gem } from 'lucide-react';
+import LoadingLogo from './assets/Emerald-loading.svg';
 import './App.css';
 
 // Protected Route Wrapper
@@ -28,9 +28,18 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
-        <Gem className="w-12 h-12 text-accent animate-pulse mb-4" />
-        <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-accent/15 blur-[100px] rounded-full"></div>
+        
+        <div className="relative z-10 flex flex-col items-center">
+          <img 
+            src={LoadingLogo} 
+            alt="Loading..." 
+            className="w-16 h-16 animate-pulse mb-8 drop-shadow-[0_0_20px_rgba(0,200,83,0.3)]" 
+          />
+          <div className="w-10 h-10 border-[3px] border-accent/20 border-t-accent rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
