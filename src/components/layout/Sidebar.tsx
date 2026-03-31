@@ -81,9 +81,8 @@ const JournalSwitcher: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) =>
                 key={j.id}
                 onClick={() => handleSwitch(j.id)}
                 disabled={isLoading}
-                className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-accent/10 ${
-                  isActive ? 'text-accent' : 'text-text-secondary hover:text-accent'
-                }`}
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-accent/10 ${isActive ? 'text-accent' : 'text-text-secondary hover:text-accent'
+                  }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <BookOpen className="w-4 h-4 shrink-0" />
@@ -117,93 +116,90 @@ export const Sidebar: React.FC = () => {
 
   return (
     <>
-    <aside
-      className={`relative z-10 flex flex-col bg-bg-surface border-r border-divider transition-all duration-300 ease-in-out ${
-        isCollapsed ? 'w-[64px] overflow-visible' : 'w-[240px]'
-      }`}
-    >
-      {isCollapsed && (
-        <button
-          onClick={() => setIsCollapsed(false)}
-          className="absolute -right-3 top-5 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-bg-surface border border-accent/40 text-accent hover:bg-accent hover:text-white transition-colors shadow-md"
-          title="Expand sidebar"
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
-      )}
-      {/* Brand / Logo */}
-      <div className={`flex items-center h-16 border-b border-divider/50 shrink-0 transition-all ${isCollapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
-        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-          <img 
-            src={LogoIcon} 
-            alt="Emerald" 
-            className="w-8 h-8 shrink-0 object-contain"
-          />
-          {!isCollapsed && (
-            <span className="text-[19px] font-[900] tracking-[-0.5px] text-white whitespace-nowrap">
-              EMERALD
-            </span>
-          )}
-        </div>
-        {!isCollapsed && (
+      <aside
+        className={`relative z-10 flex flex-col bg-bg-surface border-r border-divider transition-all duration-300 ease-in-out ${isCollapsed ? 'w-[64px] overflow-visible' : 'w-[240px]'
+          }`}
+      >
+        {isCollapsed && (
           <button
-            onClick={() => setIsCollapsed(true)}
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-            title="Collapse sidebar"
+            onClick={() => setIsCollapsed(false)}
+            className="absolute -right-3 top-5 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-bg-surface border border-accent/40 text-accent hover:bg-accent hover:text-white transition-colors shadow-md"
+            title="Expand sidebar"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         )}
-      </div>
+        {/* Brand / Logo */}
+        <div className={`flex items-center h-16 border-b border-divider/50 shrink-0 transition-all ${isCollapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+            <img
+              src={LogoIcon}
+              alt="Emerald"
+              className="w-8 h-8 shrink-0 object-contain"
+            />
+            {!isCollapsed && (
+              <span className="text-[18px] font-[500] tracking-[-0.5px] text-white whitespace-nowrap">
+                EMERALD
+              </span>
+            )}
+          </div>
+          {!isCollapsed && (
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
-      {/* Main Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-[12px] transition-colors ${
-                isActive
+        {/* Main Navigation */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-[12px] transition-colors ${isActive
                   ? 'bg-accent/10 text-accent'
                   : 'text-text-secondary hover:bg-accent/10 hover:text-accent'
-              }`
-            }
-          >
-            <item.icon className="w-5 h-5 shrink-0" />
-            {!isCollapsed && <span>{item.name}</span>}
-          </NavLink>
-        ))}
+                }`
+              }
+            >
+              <item.icon className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span>{item.name}</span>}
+            </NavLink>
+          ))}
 
-        {/* New Trade Button */}
-        <div className="pt-4 mt-4 border-t border-divider/50 px-1">
+          {/* New Trade Button */}
+          <div className="pt-4 mt-4 border-t border-divider/50 px-1">
+            <button
+              className={`w-full flex items-center justify-center gap-2 bg-accent-dark text-white rounded-[12px] p-3 hover:bg-accent transition-colors ${isCollapsed ? 'px-0' : 'px-3'
+                }`}
+              onClick={() => setShowTradeForm(true)}
+            >
+              <Plus className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span className="font-semibold">New Trade</span>}
+            </button>
+          </div>
+        </nav>
+
+        {/* Footer Area: Journal Switcher & Collapse Toggle */}
+        <div className="p-3 border-t border-divider shrink-0 flex flex-col gap-2">
+          <JournalSwitcher isCollapsed={isCollapsed} />
+
           <button
-            className={`w-full flex items-center justify-center gap-2 bg-accent-dark text-white rounded-[12px] p-3 hover:bg-accent transition-colors ${
-              isCollapsed ? 'px-0' : 'px-3'
-            }`}
-            onClick={() => setShowTradeForm(true)}
+            onClick={() => signOut()}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full p-2 rounded-[12px] text-negative hover:bg-negative/10 transition-colors mt-2`}
+            title="Log out"
           >
-            <Plus className="w-5 h-5 shrink-0" />
-            {!isCollapsed && <span className="font-semibold">New Trade</span>}
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!isCollapsed && <span className="ml-3 truncate text-subhead font-medium">Log Out</span>}
           </button>
+
         </div>
-      </nav>
-
-      {/* Footer Area: Journal Switcher & Collapse Toggle */}
-      <div className="p-3 border-t border-divider shrink-0 flex flex-col gap-2">
-        <JournalSwitcher isCollapsed={isCollapsed} />
-
-        <button
-          onClick={() => signOut()}
-          className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full p-2 rounded-[12px] text-negative hover:bg-negative/10 transition-colors mt-2`}
-          title="Log out"
-        >
-          <LogOut className="w-5 h-5 shrink-0" />
-          {!isCollapsed && <span className="ml-3 truncate text-subhead font-medium">Log Out</span>}
-        </button>
-
-      </div>
-    </aside>
+      </aside>
 
       {showTradeForm && (
         <TradeForm onClose={() => setShowTradeForm(false)} />
