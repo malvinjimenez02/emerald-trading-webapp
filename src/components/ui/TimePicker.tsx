@@ -62,7 +62,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   useEffect(() => {
     if (!open) return;
     setTimeout(() => {
-      const scrollTo = (containerRef: React.RefObject<HTMLDivElement>) => {
+      const scrollTo = (containerRef: React.RefObject<HTMLDivElement | null>) => {
         const sel = containerRef.current?.querySelector('[data-selected="true"]') as HTMLElement;
         if (sel && containerRef.current) {
           const top = sel.offsetTop - containerRef.current.clientHeight / 2 + sel.clientHeight / 2;
