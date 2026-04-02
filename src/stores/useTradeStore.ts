@@ -7,6 +7,7 @@ import type { AccountConfig } from '../types/account';
 import { journalToConfig } from '../types/account';
 import { calculateMetrics, calculateR } from '../utils/calculations';
 import { useAuthStore } from './useAuthStore';
+import { parsePrice } from '../utils/numbers';
 
 // ─── Empty metrics fallback ───────────────────────────────────────────────────
 
@@ -122,11 +123,11 @@ function buildTradeFromForm(
   _journalId: string,
   _userId: string | undefined
 ): Trade {
-  const entryPrice = parseFloat(form.entryPrice);
-  const stopLoss   = parseFloat(form.stopLoss);
-  const takeProfit = form.takeProfit ? parseFloat(form.takeProfit) : undefined;
-  const exitPrice  = form.exitPrice  ? parseFloat(form.exitPrice)  : undefined;
-  const pnlAmount  = form.pnlAmount  ? parseFloat(form.pnlAmount)  : undefined;
+  const entryPrice = parsePrice(form.entryPrice) || 0;
+  const stopLoss   = parsePrice(form.stopLoss) || 0;
+  const takeProfit = parsePrice(form.takeProfit);
+  const exitPrice  = parsePrice(form.exitPrice);
+  const pnlAmount  = parsePrice(form.pnlAmount);
 
   const isClosed = form.result !== TradeResult.Open;
 
@@ -135,14 +136,14 @@ function buildTradeFromForm(
 
   // Prefer geometry-based R (exit price) over PnL-based estimation
   let rValue: number | undefined;
-  if (exitPrice !== undefined && !isNaN(exitPrice)) {
-    const computed = calculateR(form.direction, entryPrice, exitPrice, stopLoss);
+  if (exitPrice !== null && !isNaN(exitPrice)) {
+    const computed = calculateR(form.direction, entryPrice!, exitPrice!, stopLoss!);
     if (computed !== null) rValue = computed;
-  } else if (isClosed && pnlAmount !== undefined && !isNaN(pnlAmount)) {
+  } else if (isClosed && pnlAmount !== null && !isNaN(pnlAmount)) {
     const riskPerTrade = 100; // default; overridden by journal config in metrics
     rValue = form.result === TradeResult.Win
-      ? Math.abs(pnlAmount) / riskPerTrade
-      : -(Math.abs(pnlAmount) / riskPerTrade);
+      ? Math.abs(pnlAmount!) / riskPerTrade
+      : -(Math.abs(pnlAmount!) / riskPerTrade);
   }
 
   return {
@@ -151,11 +152,11 @@ function buildTradeFromForm(
     direction: form.direction,
     entryPrice,
     stopLoss,
-    takeProfit: takeProfit !== undefined && !isNaN(takeProfit) ? takeProfit : undefined,
-    exitPrice: exitPrice !== undefined && !isNaN(exitPrice) ? exitPrice : undefined,
+    takeProfit: takeProfit ?? undefined,
+    exitPrice: exitPrice ?? undefined,
     result: form.result,
     rValue,
-    pnlAmount: pnlAmount !== undefined && !isNaN(pnlAmount) ? pnlAmount : undefined,
+    pnlAmount: pnlAmount ?? undefined,
     status: isClosed ? TradeStatus.Closed : TradeStatus.Open,
     notes: form.notes || undefined,
     screenshotUri: form.screenshotUri || undefined,

@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, TrendingUp, TrendingDown, ImagePlus, Trash2, Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { X, TrendingUp, TrendingDown, Loader2, Camera } from 'lucide-react';
+import dayjs from 'dayjs';
 import { DatePicker } from '../ui/DatePicker';
 import { TimePicker } from '../ui/TimePicker';
+import RCalculatorWidget from './RCalculatorWidget';
+import { useRCalculator } from '../../hooks/useRCalculator';
 import { TradeDirection, TradeResult } from '../../types/trade';
 import type { TradeFormData } from '../../types/trade';
 import { useTradeStore } from '../../stores/useTradeStore';
@@ -9,6 +12,7 @@ import { useJournalStore } from '../../stores/useJournalStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { validateTradeForm } from '../../utils/validators';
 import { supabase } from '../../services/supabase';
+import { parsePrice } from '../../utils/numbers';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,14 +63,22 @@ interface FieldProps {
   label: string;
   error?: string;
   required?: boolean;
+  optionalLabel?: string;
   children: React.ReactNode;
 }
 
-const Field: React.FC<FieldProps> = ({ label, error, required, children }) => (
+const Field: React.FC<FieldProps> = ({ label, error, required, optionalLabel, children }) => (
   <div className="flex flex-col gap-1.5">
-    <label className="text-[12px] font-semibold uppercase tracking-wider text-text-secondary">
-      {label}{required && <span className="text-negative ml-0.5">*</span>}
-    </label>
+    <div className="flex items-center">
+      <label className="text-[12px] font-semibold uppercase tracking-wider text-[#505866]">
+        {label}{required && <span className="text-negative ml-0.5">*</span>}
+      </label>
+      {optionalLabel && (
+        <span className="text-[9px] text-[#505866] font-normal ml-1 lowercase">
+          {optionalLabel}
+        </span>
+      )}
+    </div>
     {children}
     {error && (
       <p className="text-[12px] text-negative">{error}</p>
@@ -74,13 +86,21 @@ const Field: React.FC<FieldProps> = ({ label, error, required, children }) => (
   </div>
 );
 
+const SectionSeparator: React.FC<{ label: string }> = ({ label }) => (
+  <div className="flex items-center gap-3 mb-[9px] mt-1">
+    <span className="text-[9px] font-bold text-[#505866] uppercase tracking-[0.12em] shrink-0">
+      {label}
+    </span>
+    <div className="flex-1 h-px bg-[#242C3A]" />
+  </div>
+);
+
 const inputClass = (error?: string) =>
-  `w-full bg-bg rounded-[10px] border px-3 py-2.5 text-[14px] text-text placeholder-text-tertiary
-   focus:outline-none focus:ring-1 transition-colors ${
-     error
-       ? 'border-negative focus:border-negative focus:ring-negative/30'
-       : 'border-divider focus:border-accent focus:ring-accent/20'
-   }`;
+  `w-full bg-bg rounded-[10px] border px-3 py-2.5 text-[14px] text-text placeholder-[#28313F]
+   focus:outline-none focus:ring-1 transition-colors ${error
+    ? 'border-negative focus:border-negative focus:ring-negative/30'
+    : 'border-[#28313F] focus:border-accent focus:ring-accent/20'
+  }`;
 
 // ─── TradeForm ────────────────────────────────────────────────────────────────
 
@@ -98,25 +118,23 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
 
   const isEditMode = Boolean(tradeId);
 
-  const [form, setForm]           = useState<TradeFormData>(() => ({ ...getEmptyForm(), ...initialData }));
-  const [errors, setErrors]       = useState<Record<string, string>>({});
-  const [saving, setSaving]       = useState(false);
+  const [form, setForm] = useState<TradeFormData>(() => ({ ...getEmptyForm(), ...initialData }));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(
     initialData?.screenshotUri || null
   );
 
-  const assetRef      = useRef<HTMLInputElement>(null);
-  const notesRef      = useRef<HTMLTextAreaElement>(null);
-  const overlayRef    = useRef<HTMLDivElement>(null);
-  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const assetRef = useRef<HTMLInputElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleScreenshot = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Show local preview immediately while uploading
     const localUrl = URL.createObjectURL(file);
     setScreenshotPreview(localUrl);
     setUploading(true);
@@ -140,7 +158,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
       set('screenshotUri', publicUrl);
     } catch (err) {
       console.error('[TradeForm] screenshot upload failed:', err);
-      // Keep local blob as fallback so user isn't blocked
       set('screenshotUri', localUrl);
       setErrors(prev => ({ ...prev, _screenshot: 'Upload failed — screenshot saved locally only' }));
     } finally {
@@ -149,7 +166,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
   };
 
   const removeScreenshot = async () => {
-    // Delete from Supabase Storage if it's a remote URL from our bucket
     if (screenshotPreview && !screenshotPreview.startsWith('blob:')) {
       const url = new URL(screenshotPreview);
       const pathMatch = url.pathname.match(/\/object\/public\/screenshots\/(.+)$/);
@@ -163,13 +179,43 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Auto-focus asset name on open
+  const entryDateObj = useMemo(() =>
+    form.entryDate && form.entryTime ? new Date(`${form.entryDate}T${form.entryTime}`) : null,
+    [form.entryDate, form.entryTime]
+  );
+  const closeDateObj = useMemo(() =>
+    form.closeDate && form.closeTime ? new Date(`${form.closeDate}T${form.closeTime}`) : null,
+    [form.closeDate, form.closeTime]
+  );
+
+  const rCalc = useRCalculator(
+    form.direction === TradeDirection.Long ? 'long' : 'short',
+    parsePrice(form.entryPrice),
+    parsePrice(form.stopLoss),
+    parsePrice(form.takeProfit),
+    parsePrice(form.exitPrice),
+    entryDateObj,
+    closeDateObj
+  );
+
   useEffect(() => {
     const t = setTimeout(() => assetRef.current?.focus(), 60);
     return () => clearTimeout(t);
   }, []);
 
-  // Escape to close
+  // Auto-detect result logic based on rExecuted
+  useEffect(() => {
+    if (rCalc.rExecuted !== null && !isEditMode) {
+      if (rCalc.rExecuted > 0.1) {
+        set('result', TradeResult.Win);
+      } else if (rCalc.rExecuted < -0.1) {
+        set('result', TradeResult.Loss);
+      } else {
+        set('result', TradeResult.Open); // BE
+      }
+    }
+  }, [rCalc.rExecuted, isEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -178,13 +224,10 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  // Lock body scroll while open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const set = <K extends keyof TradeFormData>(key: K, value: TradeFormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -201,8 +244,6 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
     return true;
   }, [form]);
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
-
   const handleSubmit = async () => {
     if (!validate()) return;
     if (!activeJournal) return;
@@ -211,21 +252,21 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
     try {
       if (isEditMode && tradeId) {
         await updateTrade(tradeId, {
-          assetName:   form.assetName,
-          direction:   form.direction,
-          entryPrice:  parseFloat(form.entryPrice),
-          stopLoss:    parseFloat(form.stopLoss),
-          takeProfit:  form.takeProfit ? parseFloat(form.takeProfit) : undefined,
-          exitPrice:   form.exitPrice ? parseFloat(form.exitPrice) : undefined,
-          result:      form.result,
-          pnlAmount:   form.pnlAmount ? parseFloat(form.pnlAmount) : undefined,
-          notes:       form.notes || undefined,
+          assetName: form.assetName,
+          direction: form.direction,
+          entryPrice: parsePrice(form.entryPrice) || 0,
+          stopLoss: parsePrice(form.stopLoss) || 0,
+          takeProfit: parsePrice(form.takeProfit) || undefined,
+          exitPrice: parsePrice(form.exitPrice) || undefined,
+          result: form.result,
+          rValue: rCalc.rExecuted ?? undefined,
+          pnlAmount: parsePrice(form.pnlAmount) || undefined,
+          notes: form.notes || undefined,
           screenshotUri: form.screenshotUri || undefined,
-          entryDate:   toISO(form.entryDate, form.entryTime),
-          closeDate:   form.result !== TradeResult.Open ? toISO(form.closeDate, form.closeTime) : null,
+          entryDate: toISO(form.entryDate, form.entryTime),
+          closeDate: toISO(form.closeDate, form.closeTime),
         });
       } else {
-        if (!activeJournal) return;
         await addTrade(form, activeJournal.id);
       }
       onClose();
@@ -237,21 +278,30 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
     }
   };
 
-  // Enter on last field = submit
-  const handleNotesKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit();
-  };
-
-  // Click overlay to close
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) onClose();
   };
 
-  const isFormValid = form.assetName.trim() !== '' &&
-    form.entryPrice !== '' &&
-    form.stopLoss !== '';
+  const isFormValid = useMemo(() => {
+    const entryDateFull = dayjs(`${form.entryDate}T${form.entryTime}`);
+    const closeDateFull = dayjs(`${form.closeDate}T${form.closeTime}`);
+    const entryPriceNum = parsePrice(form.entryPrice);
+    const stopLossNum = parsePrice(form.stopLoss);
+    const exitPriceNum = parsePrice(form.exitPrice);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+    return (
+      form.assetName.trim() !== '' &&
+      !!form.direction &&
+      !!form.result &&
+      entryDateFull.isValid() &&
+      closeDateFull.isValid() &&
+      closeDateFull.isSameOrAfter(entryDateFull) &&
+      entryPriceNum !== null && entryPriceNum > 0 &&
+      stopLossNum !== null && stopLossNum > 0 &&
+      exitPriceNum !== null && exitPriceNum > 0 &&
+      entryPriceNum !== stopLossNum
+    );
+  }, [form]);
 
   return (
     <div
@@ -263,333 +313,250 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
         role="dialog"
         aria-modal="true"
         aria-label="New Trade"
-        className="bg-bg-surface rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-[#1A202A] rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
       >
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-[18px] font-bold text-text">{isEditMode ? 'Edit Trade' : 'New Trade'}</h2>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-[18px] font-bold text-white">{isEditMode ? 'Editar Trade' : 'Nuevo Trade'}</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-text-secondary hover:bg-bg-secondary hover:text-text transition-colors"
-            aria-label="Close"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-text-secondary hover:bg-bg-secondary hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
 
-          {/* ── Asset Name ── */}
-          <Field label="Asset Name" required error={errors.assetName}>
-            <input
-              ref={assetRef}
-              type="text"
-              placeholder="e.g. BTC/USDT"
-              value={form.assetName}
-              onChange={e => set('assetName', e.target.value)}
-              className={inputClass(errors.assetName)}
-              autoComplete="off"
-              tabIndex={1}
-            />
-            {/* Quick-select chips */}
-            <div className="flex flex-wrap gap-1.5 mt-1">
-              {QUICK_ASSETS.map(asset => (
-                <button
-                  key={asset}
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => set('assetName', asset)}
-                  className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
-                    form.assetName === asset
-                      ? 'bg-accent/10 border-accent/40 text-accent'
-                      : 'bg-bg border-divider text-text-secondary hover:border-accent/30 hover:text-text'
-                  }`}
-                >
-                  {asset}
-                </button>
-              ))}
-            </div>
-          </Field>
+          {/* 1. Qué operé */}
+          <section className="flex flex-col gap-4">
+            <SectionSeparator label="Qué operé?" />
 
-          {/* ── Direction ── */}
-          <Field label="Direction" required>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                tabIndex={2}
-                onClick={() => set('direction', TradeDirection.Long)}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-[10px] border font-semibold text-[14px] transition-colors ${
-                  form.direction === TradeDirection.Long
-                    ? 'bg-positive/10 border-positive/40 text-positive'
-                    : 'bg-bg border-divider text-text-secondary hover:border-positive/30'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                Long
-              </button>
-              <button
-                type="button"
-                tabIndex={3}
-                onClick={() => set('direction', TradeDirection.Short)}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-[10px] border font-semibold text-[14px] transition-colors ${
-                  form.direction === TradeDirection.Short
-                    ? 'bg-negative/10 border-negative/40 text-negative'
-                    : 'bg-bg border-divider text-text-secondary hover:border-negative/30'
-                }`}
-              >
-                <TrendingDown className="w-4 h-4" />
-                Short
-              </button>
-            </div>
-          </Field>
-
-          {/* ── Entry Date & Time ── */}
-          <Field label="Entry Date & Time" required error={errors.entryDate ?? errors.entryTime}>
-            <div className="flex gap-2">
-              <DatePicker
-                value={form.entryDate}
-                onChange={v => set('entryDate', v)}
-                error={!!errors.entryDate}
-                tabIndex={4}
-              />
-              <TimePicker
-                value={form.entryTime}
-                onChange={v => set('entryTime', v)}
-                error={!!errors.entryTime}
-                tabIndex={5}
-              />
-            </div>
-          </Field>
-
-          {/* ── Close Date & Time ── */}
-          <Field label="Close Date & Time" error={errors.closeDate ?? errors.closeTime}>
-            <div className="flex gap-2">
-              <DatePicker
-                value={form.closeDate}
-                onChange={v => set('closeDate', v)}
-                disabled={form.result === TradeResult.Open}
-                error={!!errors.closeDate}
-                tabIndex={6}
-              />
-              <TimePicker
-                value={form.closeTime}
-                onChange={v => set('closeTime', v)}
-                disabled={form.result === TradeResult.Open}
-                error={!!errors.closeTime}
-                tabIndex={7}
-              />
-            </div>
-            {form.result === TradeResult.Open && (
-              <p className="text-[11px] text-text-tertiary">Trade open — will be recorded on close</p>
-            )}
-          </Field>
-
-          {/* ── Prices grid ── */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Entry Price" required error={errors.entryPrice}>
+            <Field label="Activo" required error={errors.assetName}>
               <input
-                type="number"
-                step="any"
-                min="0"
-                placeholder="0.00"
-                value={form.entryPrice}
-                onChange={e => set('entryPrice', e.target.value)}
-                className={inputClass(errors.entryPrice)}
-                tabIndex={8}
+                ref={assetRef}
+                type="text"
+                placeholder="e.g. NQ, BTC/USDT"
+                value={form.assetName}
+                onChange={e => set('assetName', e.target.value)}
+                className={inputClass(errors.assetName)}
+                autoComplete="off"
               />
-            </Field>
-            <Field label="Stop Loss" required error={errors.stopLoss}>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                placeholder="0.00"
-                value={form.stopLoss}
-                onChange={e => set('stopLoss', e.target.value)}
-                className={inputClass(errors.stopLoss)}
-                tabIndex={9}
-              />
-            </Field>
-            <Field label="Take Profit" error={errors.takeProfit}>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                placeholder="0.00 (opt)"
-                value={form.takeProfit}
-                onChange={e => set('takeProfit', e.target.value)}
-                className={inputClass(errors.takeProfit)}
-                tabIndex={10}
-              />
-            </Field>
-            <Field label="Exit Price" error={errors.exitPrice}>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                placeholder="0.00 (opt)"
-                value={form.exitPrice}
-                onChange={e => set('exitPrice', e.target.value)}
-                className={inputClass(errors.exitPrice)}
-                tabIndex={11}
-              />
-            </Field>
-          </div>
-
-          {/* ── Result ── */}
-          <Field label="Result" required>
-            <div className="flex gap-3">
-              {[
-                { value: TradeResult.Win,  label: 'Win',  color: 'positive' },
-                { value: TradeResult.Loss, label: 'Loss', color: 'negative' },
-                { value: TradeResult.Open, label: 'Break Even', color: 'neutral'  },
-              ].map(({ value, label, color }) => {
-                const isActive = form.result === value;
-                const colorMap = {
-                  positive: isActive
-                    ? 'border-positive bg-positive/10 text-positive'
-                    : 'border-divider text-text-secondary hover:border-positive/30',
-                  negative: isActive
-                    ? 'border-negative bg-negative/10 text-negative'
-                    : 'border-divider text-text-secondary hover:border-negative/30',
-                  neutral: isActive
-                    ? 'border-warning/40 bg-warning/10 text-warning'
-                    : 'border-divider text-text-secondary hover:border-warning/30',
-                };
-                return (
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {QUICK_ASSETS.map(asset => (
                   <button
-                    key={value}
+                    key={asset}
                     type="button"
-                    tabIndex={7}
-                    onClick={() => set('result', value)}
-                    className={`flex-1 flex items-center gap-2.5 py-2.5 px-3 rounded-[10px] border font-semibold text-[14px] transition-colors ${colorMap[color as keyof typeof colorMap]}`}
+                    onClick={() => set('assetName', asset)}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${form.assetName === asset
+                      ? 'bg-accent/10 border-accent/40 text-accent'
+                      : 'bg-[#212836] border-[#242C3A] text-[#747D8A] hover:border-accent/30 hover:text-white'
+                      }`}
                   >
-                    {/* Custom radio circle */}
-                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      isActive ? 'border-current' : 'border-divider'
-                    }`}>
-                      {isActive && <span className="w-2 h-2 rounded-full bg-current" />}
-                    </span>
-                    {label}
+                    {asset}
                   </button>
-                );
-              })}
-            </div>
-          </Field>
-
-          {/* ── P&L Amount ── */}
-          <Field label="P&L Amount (USD)" error={errors.pnlAmount}>
-            <input
-              type="number"
-              step="any"
-              placeholder="Optional — e.g. 250.00"
-              value={form.pnlAmount}
-              onChange={e => set('pnlAmount', e.target.value)}
-              className={inputClass(errors.pnlAmount)}
-              tabIndex={12}
-            />
-          </Field>
-
-          {/* ── Screenshot ── */}
-          <Field label="Screenshot">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleScreenshot}
-              tabIndex={-1}
-            />
-
-            {screenshotPreview ? (
-              <div className="relative group rounded-[10px] overflow-hidden border border-divider">
-                <img
-                  src={screenshotPreview}
-                  alt="Trade screenshot"
-                  className="w-full max-h-[180px] object-cover"
-                />
-                {uploading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50">
-                    <Loader2 className="w-6 h-6 text-white animate-spin" />
-                    <span className="text-[12px] text-white font-medium">Uploading…</span>
-                  </div>
-                )}
-                {!uploading && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={removeScreenshot}
-                      className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-negative/80"
-                      aria-label="Remove screenshot"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    >
-                      <span className="text-[12px] text-white font-medium">Change image</span>
-                    </div>
-                  </>
-                )}
+                ))}
               </div>
+            </Field>
+
+            <Field label="Dirección" required>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => set('direction', TradeDirection.Long)}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-[10px] border font-semibold text-[14px] transition-colors ${form.direction === TradeDirection.Long
+                    ? 'bg-[rgba(16,226,97,0.12)] border-[rgba(16,226,97,0.3)] text-[#10E261]'
+                    : 'bg-[#212836] border-[#28313F] text-[#747D8A]'
+                    }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Long
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set('direction', TradeDirection.Short)}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-[10px] border font-semibold text-[14px] transition-colors ${form.direction === TradeDirection.Short
+                    ? 'bg-[rgba(248,81,73,0.12)] border-[rgba(248,81,73,0.3)] text-[#F85149]'
+                    : 'bg-[#212836] border-[#28313F] text-[#747D8A]'
+                    }`}
+                >
+                  <TrendingDown className="w-4 h-4" />
+                  Short
+                </button>
+              </div>
+            </Field>
+          </section>
+
+          {/* 2. Entrada */}
+          <section className="flex flex-col gap-4">
+            <SectionSeparator label="Entrada" />
+
+            <Field label="Fecha y hora de entrada" required error={errors.entryDate ?? errors.entryTime}>
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker value={form.entryDate} onChange={v => set('entryDate', v)} error={!!errors.entryDate} />
+                <TimePicker value={form.entryTime} onChange={v => set('entryTime', v)} error={!!errors.entryTime} />
+              </div>
+            </Field>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Precio de entrada" required error={errors.entryPrice}>
+                <input
+                  type="text" placeholder="0.00"
+                  value={form.entryPrice} onChange={e => set('entryPrice', e.target.value)}
+                  className={inputClass(errors.entryPrice)}
+                />
+              </Field>
+              <Field label="Stop Loss" required error={errors.stopLoss}>
+                <input
+                  type="text" placeholder="0.00"
+                  value={form.stopLoss} onChange={e => set('stopLoss', e.target.value)}
+                  className={inputClass(errors.stopLoss)}
+                />
+              </Field>
+            </div>
+
+            <Field label="Take Profit" optionalLabel="(opcional)" error={errors.takeProfit}>
+              <input
+                type="text" placeholder="0.00"
+                value={form.takeProfit} onChange={e => set('takeProfit', e.target.value)}
+                className={inputClass(errors.takeProfit)}
+              />
+            </Field>
+          </section>
+
+          {/* 3. Cierre */}
+          <section className="flex flex-col gap-4">
+            <SectionSeparator label="Cierre" />
+
+            <Field label="Fecha y hora de cierre" required error={errors.closeDate ?? errors.closeTime}>
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker value={form.closeDate} onChange={v => set('closeDate', v)} error={!!errors.closeDate} />
+                <TimePicker value={form.closeTime} onChange={v => set('closeTime', v)} error={!!errors.closeTime} />
+              </div>
+            </Field>
+
+            <Field label="Precio de salida" required error={errors.exitPrice}>
+              <input
+                type="text" placeholder="0.00"
+                value={form.exitPrice} onChange={e => set('exitPrice', e.target.value)}
+                className={inputClass(errors.exitPrice)}
+              />
+            </Field>
+
+            {!isEditMode ? (
+              <RCalculatorWidget {...rCalc} />
             ) : (
-              <button
-                type="button"
-                tabIndex={9}
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-[10px] border border-dashed border-divider text-text-secondary hover:border-accent/40 hover:text-accent hover:bg-accent/5 transition-colors"
+              <div className="bg-[#0D1117] border border-[#242C3A] rounded-lg p-3 mb-2.5 flex items-center justify-between">
+                <span className="text-[11px] text-[#747D8A]">R-Value persistido</span>
+                <span className={`text-[16px] font-bold ${rCalc.rExecuted !== null ? (rCalc.rExecuted > 0 ? 'text-[#10E261]' : 'text-[#F85149]') : 'text-[#505866]'}`}>
+                  {rCalc.rExecuted !== null ? `${rCalc.rExecuted > 0 ? '+' : ''}${rCalc.rExecuted}R` : '—'}
+                </span>
+              </div>
+            )}
+          </section>
+
+          {/* 4. Resultado */}
+          <section className="flex flex-col gap-4">
+            <SectionSeparator label="Resultado" />
+
+            <Field label="Resultado" required>
+              <div className="flex gap-2">
+                {[
+                  { v: TradeResult.Win, l: 'Win', c: '#10E261', b: 'rgba(16,226,97,0.12)', br: 'rgba(16,226,97,0.3)' },
+                  { v: TradeResult.Loss, l: 'Loss', c: '#F85149', b: 'rgba(248,81,73,0.12)', br: 'rgba(248,81,73,0.3)' },
+                  { v: TradeResult.Open, l: 'BE', c: '#F0883E', b: 'rgba(240,136,62,0.12)', br: 'rgba(240,136,62,0.3)' },
+                ].map((r) => (
+                  <button
+                    key={r.v} type="button"
+                    onClick={() => set('result', r.v)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[10px] border font-semibold text-[14px] transition-colors ${form.result === r.v ? '' : 'bg-[#212836] border-[#28313F] text-[#747D8A]'
+                      }`}
+                    style={form.result === r.v ? { backgroundColor: r.b, borderColor: r.br, color: r.c } : {}}
+                  >
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: r.c }} />
+                    {r.l}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="P&L en USD" optionalLabel="(opcional — secundario al R)" error={errors.pnlAmount}>
+              <input
+                type="text" placeholder="e.g. 180.00"
+                value={form.pnlAmount} onChange={e => set('pnlAmount', e.target.value)}
+                className={inputClass(errors.pnlAmount)}
+              />
+            </Field>
+          </section>
+
+          {/* 5. Contexto */}
+          <section className="flex flex-col gap-4">
+            <SectionSeparator label="Contexto" />
+
+            <Field label="Screenshot" optionalLabel="(opcional)">
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleScreenshot} />
+
+              <div
+                onClick={() => !screenshotPreview && fileInputRef.current?.click()}
+                className={`flex items-center gap-[10px] p-[9px] px-[12px] rounded-lg border border-dashed transition-colors ${screenshotPreview ? 'bg-[#0D1117] border-[#28313F]' : 'bg-[#0D1117] border-[#28313F] cursor-pointer hover:border-accent/40'
+                  }`}
               >
-                <ImagePlus className="w-5 h-5" />
-                <span className="text-[12px] font-medium">Click to add screenshot</span>
-                <span className="text-[11px] text-text-tertiary">PNG, JPG, WEBP</span>
-              </button>
-            )}
-            {errors._screenshot && (
-              <p className="text-[11px] text-warning">{errors._screenshot}</p>
-            )}
-          </Field>
+                <div className="w-7 h-7 bg-[#212836] rounded-md flex items-center justify-center shrink-0 border border-[#28313F] overflow-hidden">
+                  {screenshotPreview ? (
+                    <img src={screenshotPreview} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-[14px] text-[#505866]" />
+                  )}
+                </div>
 
-          {/* ── Notes ── */}
-          <Field label="Notes">
-            <textarea
-              ref={notesRef}
-              rows={3}
-              placeholder="Setup, market context, lessons learned…"
-              value={form.notes}
-              onChange={e => set('notes', e.target.value)}
-              onKeyDown={handleNotesKeyDown}
-              className={`${inputClass()} resize-none`}
-              tabIndex={13}
-            />
-            <p className="text-[11px] text-text-tertiary -mt-0.5">Ctrl+Enter to save</p>
-          </Field>
+                <div className="flex-1 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-medium text-[#10E261]">
+                      {screenshotPreview ? 'Screenshot añadido' : 'Añadir screenshot'}
+                    </span>
+                    {!screenshotPreview && <span className="text-[11px] text-[#505866]"> — PNG, JPG, WEBP</span>}
+                  </div>
 
-          {/* ── Form-level error ── */}
+                  {screenshotPreview && !uploading && (
+                    <button
+                      type="button" onClick={(e) => { e.stopPropagation(); removeScreenshot(); }}
+                      className="text-[#505866] hover:text-negative transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {uploading && <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />}
+                </div>
+              </div>
+            </Field>
+
+            <Field label="Notas">
+              <textarea
+                rows={3} placeholder="Notas del trade..."
+                value={form.notes} onChange={e => set('notes', e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit(); }}
+                className={`${inputClass()} resize-none`}
+              />
+              <p className="text-[10px] text-[#505866] mt-0.5">Ctrl+Enter para guardar</p>
+            </Field>
+          </section>
+
           {errors._form && (
-            <p className="text-[13px] text-negative bg-negative/10 rounded-lg px-3 py-2">
-              {errors._form}
-            </p>
+            <p className="text-[13px] text-negative bg-negative/10 rounded-lg px-3 py-2">{errors._form}</p>
           )}
 
-          {/* ── Actions ── */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3 pt-2">
             <button
-              type="button"
-              onClick={onClose}
-              tabIndex={14}
-              className="flex-1 py-3 rounded-[12px] border border-negative/60 text-negative hover:bg-negative/10 font-semibold text-[14px] transition-colors"
+              type="button" onClick={onClose}
+              className="flex-1 py-3 rounded-[12px] border border-[rgba(248,81,73,0.4)] text-[#F85149] hover:bg-negative/5 font-semibold text-[14px] transition-colors"
             >
-              Cancel
+              Cancelar
             </button>
             <button
-              type="button"
-              onClick={handleSubmit}
+              type="button" onClick={handleSubmit}
               disabled={!isFormValid || saving || uploading}
-              tabIndex={15}
-              className="flex-1 py-3 rounded-[12px] bg-accent text-white font-bold text-[14px] hover:bg-accent-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-[2] py-3 rounded-[12px] bg-[#10E261] text-[#0F1219] font-bold text-[14px] hover:brightness-110 transition-all disabled:opacity-40"
             >
-              {saving ? 'Saving…' : isEditMode ? 'Update Trade' : 'Save Trade'}
+              {saving ? 'Guardando...' : isEditMode ? 'Actualizar Trade' : 'Guardar Trade'}
             </button>
           </div>
 
@@ -598,3 +565,4 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
     </div>
   );
 };
+

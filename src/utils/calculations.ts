@@ -324,6 +324,58 @@ export interface RRComparison {
   isUndercutting: boolean;
 }
 
+// ─── Rolling Expectancy ──────────────────────────────────────────────────────
+
+export interface RollingExpectancyPoint {
+  tradeIndex: number;
+  label:      string;
+  expectancy: number;
+  date:       string;
+}
+
+export function calculateRollingExpectancy(
+  trades:     Trade[],
+  windowSize: number = 20,
+): RollingExpectancyPoint[] {
+  const closed = trades
+    .filter(t => t.status === TradeStatus.Closed && t.rValue != null)
+    .sort((a, b) => {
+      const da = a.entryDate ?? a.createdAt;
+      const db = b.entryDate ?? b.createdAt;
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+
+  if (closed.length < windowSize) return [];
+
+  const points: RollingExpectancyPoint[] = [];
+  for (let i = windowSize; i <= closed.length; i++) {
+    const window = closed.slice(i - windowSize, i);
+    const expectancy = window.reduce((s, t) => s + (t.rValue ?? 0), 0) / windowSize;
+    const last = window[window.length - 1];
+    const rawDate = last.closeDate ?? last.entryDate ?? last.createdAt;
+    const date = rawDate
+      ? new Date(rawDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+      : `#${i}`;
+    points.push({ tradeIndex: i, label: `Trade #${i}`, expectancy, date });
+  }
+  return points;
+}
+
+export function calculateExpectancyTrend(
+  points: RollingExpectancyPoint[],
+): 'improving' | 'declining' | 'stable' {
+  if (points.length < 2) return 'stable';
+  const mid = Math.floor(points.length / 2);
+  const firstHalf  = points.slice(0, mid);
+  const secondHalf = points.slice(mid);
+  const avg = (arr: RollingExpectancyPoint[]) =>
+    arr.reduce((s, p) => s + p.expectancy, 0) / arr.length;
+  const diff = avg(secondHalf) - avg(firstHalf);
+  if (diff > 0.05)  return 'improving';
+  if (diff < -0.05) return 'declining';
+  return 'stable';
+}
+
 export function calculateRRComparison(trades: Trade[]): RRComparison | null {
   const validTradesList = trades.filter(t => 
     t.status === TradeStatus.Closed &&

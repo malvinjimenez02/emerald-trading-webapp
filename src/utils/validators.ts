@@ -1,6 +1,7 @@
 import type { TradeFormData } from '../types/trade';
 import { TradeDirection } from '../types/trade';
 import type { AccountConfig } from '../types/account';
+import { cleanParse } from './numbers';
 
 export type ValidationResult = { valid: true } | { valid: false; errors: Record<string, string> };
 
@@ -15,8 +16,8 @@ export function validateTradeForm(input: Partial<TradeFormData>): ValidationResu
     errors.direction = 'Direction is required';
   }
 
-  const entry = parseFloat(input.entryPrice ?? '');
-  const sl = parseFloat(input.stopLoss ?? '');
+  const entry = cleanParse(input.entryPrice);
+  const sl = cleanParse(input.stopLoss);
 
   if (isNaN(entry) || entry <= 0) {
     errors.entryPrice = 'Entry price must be greater than 0';
@@ -35,17 +36,12 @@ export function validateTradeForm(input: Partial<TradeFormData>): ValidationResu
     }
   }
 
-  const tp = input.takeProfit ? parseFloat(input.takeProfit) : undefined;
-  if (tp !== undefined && !isNaN(tp) && !isNaN(entry)) {
-    if (input.direction === TradeDirection.Long && tp <= entry) {
-      errors.takeProfit = 'TP must be above entry for Long';
-    }
-    if (input.direction === TradeDirection.Short && tp >= entry) {
-      errors.takeProfit = 'TP must be below entry for Short';
-    }
+  const tp = input.takeProfit ? cleanParse(input.takeProfit) : undefined;
+  if (tp !== undefined && !isNaN(tp) && tp <= 0) {
+    errors.takeProfit = 'Take profit must be greater than 0';
   }
 
-  const ep = input.exitPrice ? parseFloat(input.exitPrice) : undefined;
+  const ep = input.exitPrice ? cleanParse(input.exitPrice) : undefined;
   if (ep !== undefined && (isNaN(ep) || ep <= 0)) {
     errors.exitPrice = 'Exit price must be greater than 0';
   }

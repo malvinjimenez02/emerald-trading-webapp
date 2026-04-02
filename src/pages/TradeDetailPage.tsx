@@ -30,6 +30,13 @@ function splitISODatetime(iso: string | null | undefined): { date: string; time:
   };
 }
 
+function fmtPrice(val: number): string {
+  const s = String(val);
+  if (!s.includes('.')) return val.toFixed(2);
+  const decimals = s.split('.')[1].length;
+  return decimals < 2 ? val.toFixed(2) : s;
+}
+
 function tradeToFormData(t: Trade): TradeFormData {
   const entry = splitISODatetime(t.entryDate);
   const close = splitISODatetime(t.closeDate ?? t.closedAt);
@@ -40,10 +47,10 @@ function tradeToFormData(t: Trade): TradeFormData {
     entryTime:    entry.time,
     closeDate:    close.date,
     closeTime:    close.time,
-    entryPrice:   String(t.entryPrice),
-    stopLoss:     String(t.stopLoss),
-    takeProfit:   t.takeProfit != null ? String(t.takeProfit) : '',
-    exitPrice:    t.exitPrice != null ? String(t.exitPrice) : '',
+    entryPrice:   fmtPrice(t.entryPrice),
+    stopLoss:     fmtPrice(t.stopLoss),
+    takeProfit:   t.takeProfit != null ? fmtPrice(t.takeProfit) : '',
+    exitPrice:    t.exitPrice != null ? fmtPrice(t.exitPrice) : '',
     result:       t.result,
     pnlAmount:    t.pnlAmount != null ? String(t.pnlAmount) : '',
     notes:        t.notes ?? '',
@@ -205,9 +212,9 @@ export const TradeDetailPage: React.FC = () => {
   const currency   = activeJournal?.currency ?? 'USD';
   const config     = activeJournal ? journalToConfig(activeJournal) : { riskPerTrade: 100 };
   const pnl        = getTradeSignedPnl(trade, config.riskPerTrade);
-  const rVal       = getTradeSignedR(trade);
+  const rVal       = trade.rValue != null ? getTradeSignedR(trade) : null;
   const isPnlPos   = pnl >= 0;
-  const isRPos     = rVal >= 0;
+  const isRPos     = (rVal ?? 0) >= 0;
   const res        = resultConfig[trade.result];
   const dir        = dirConfig[trade.direction];
   const isClosed   = trade.status === TradeStatus.Closed;
