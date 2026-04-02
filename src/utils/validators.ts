@@ -45,6 +45,19 @@ export function validateTradeForm(input: Partial<TradeFormData>): ValidationResu
     }
   }
 
+  const ep = input.exitPrice ? parseFloat(input.exitPrice) : undefined;
+  if (ep !== undefined && (isNaN(ep) || ep <= 0)) {
+    errors.exitPrice = 'Exit price must be greater than 0';
+  }
+
+  if (input.entryDate && input.closeDate && input.result !== 'open') {
+    const entryDT = new Date(`${input.entryDate}T${input.entryTime || '00:00'}:00`);
+    const closeDT = new Date(`${input.closeDate}T${input.closeTime || '00:00'}:00`);
+    if (!isNaN(entryDT.getTime()) && !isNaN(closeDT.getTime()) && closeDT < entryDT) {
+      errors.closeDate = 'Close date cannot be before entry date';
+    }
+  }
+
   return Object.keys(errors).length === 0 ? { valid: true } : { valid: false, errors };
 }
 

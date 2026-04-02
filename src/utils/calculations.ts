@@ -77,12 +77,12 @@ function getISOWeek(dateStr: string): string {
 
 function buildEquityCurve(closed: Trade[]): EquityPoint[] {
   const sorted = [...closed].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    (a, b) => new Date(a.entryDate ?? a.createdAt).getTime() - new Date(b.entryDate ?? b.createdAt).getTime()
   );
 
   const weekMap = new Map<string, number>();
   for (const trade of sorted) {
-    const week = getISOWeek(trade.closedAt ?? trade.createdAt);
+    const week = getISOWeek(trade.closeDate ?? trade.closedAt ?? trade.createdAt);
     weekMap.set(week, (weekMap.get(week) ?? 0) + (trade.rValue ?? 0));
   }
 
@@ -171,7 +171,7 @@ export function tradesByDay(trades: Trade[]): DayStats[] {
   const closed = trades.filter(t => t.status === TradeStatus.Closed);
   return days.map(({ day, short }) => {
     const group = closed.filter(t => {
-      const d = new Date(t.closedAt ?? t.createdAt).getDay(); // 1=Mon…5=Fri
+      const d = new Date(t.entryDate ?? t.createdAt).getDay(); // 1=Mon…5=Fri
       return d === ['Monday','Tuesday','Wednesday','Thursday','Friday'].indexOf(day) + 1;
     });
     const wins = group.filter(t => t.result === TradeResult.Win);
@@ -190,7 +190,7 @@ export function tradesByCalendarDay(trades: Trade[]): CalendarDayStats[] {
   const closed = trades.filter(t => t.status === TradeStatus.Closed);
   const map = new Map<string, CalendarDayStats>();
   for (const t of closed) {
-    const key = (t.closedAt ?? t.createdAt).slice(0, 10);
+    const key = (t.closeDate ?? t.closedAt ?? t.createdAt).slice(0, 10);
     const existing = map.get(key) ?? { dateKey: key, pnl: 0, total: 0 };
     existing.pnl   += t.pnlAmount ?? 0;
     existing.total += 1;
@@ -206,7 +206,7 @@ export interface StreakResult {
 
 export function calculateStreaks(trades: Trade[]): StreakResult {
   const closed = [...trades.filter(t => t.status === TradeStatus.Closed)]
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    .sort((a, b) => new Date(a.entryDate ?? a.createdAt).getTime() - new Date(b.entryDate ?? b.createdAt).getTime());
   let bestWin = 0, worstLoss = 0, curWin = 0, curLoss = 0;
   for (const t of closed) {
     if (t.result === TradeResult.Win) {

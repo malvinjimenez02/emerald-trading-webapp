@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, TrendingUp, TrendingDown, ImagePlus, Trash2, Loader2 } from 'lucide-react';
+import { DatePicker } from '../ui/DatePicker';
+import { TimePicker } from '../ui/TimePicker';
 import { TradeDirection, TradeResult } from '../../types/trade';
 import type { TradeFormData } from '../../types/trade';
 import { useTradeStore } from '../../stores/useTradeStore';
@@ -16,17 +18,40 @@ const QUICK_ASSETS = [
   'SPY', 'QQQ', 'NQ', 'ES', 'GC',
 ];
 
-const EMPTY_FORM: TradeFormData = {
-  assetName: '',
-  direction: TradeDirection.Long,
-  entryPrice: '',
-  stopLoss: '',
-  takeProfit: '',
-  result: TradeResult.Win,
-  pnlAmount: '',
-  notes: '',
-  screenshotUri: '',
-};
+function nowDatetime() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+  };
+}
+
+function getEmptyForm(): TradeFormData {
+  const { date, time } = nowDatetime();
+  return {
+    assetName: '',
+    direction: TradeDirection.Long,
+    entryDate: date,
+    entryTime: time,
+    closeDate: date,
+    closeTime: time,
+    entryPrice: '',
+    stopLoss: '',
+    takeProfit: '',
+    exitPrice: '',
+    result: TradeResult.Win,
+    pnlAmount: '',
+    notes: '',
+    screenshotUri: '',
+  };
+}
+
+function toISO(date: string, time: string): string | null {
+  if (!date) return null;
+  const d = new Date(`${date}T${time || '00:00'}:00`);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -73,7 +98,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
 
   const isEditMode = Boolean(tradeId);
 
-  const [form, setForm]           = useState<TradeFormData>({ ...EMPTY_FORM, ...initialData });
+  const [form, setForm]           = useState<TradeFormData>(() => ({ ...getEmptyForm(), ...initialData }));
   const [errors, setErrors]       = useState<Record<string, string>>({});
   const [saving, setSaving]       = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -191,10 +216,13 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
           entryPrice:  parseFloat(form.entryPrice),
           stopLoss:    parseFloat(form.stopLoss),
           takeProfit:  form.takeProfit ? parseFloat(form.takeProfit) : undefined,
+          exitPrice:   form.exitPrice ? parseFloat(form.exitPrice) : undefined,
           result:      form.result,
           pnlAmount:   form.pnlAmount ? parseFloat(form.pnlAmount) : undefined,
           notes:       form.notes || undefined,
           screenshotUri: form.screenshotUri || undefined,
+          entryDate:   toISO(form.entryDate, form.entryTime),
+          closeDate:   form.result !== TradeResult.Open ? toISO(form.closeDate, form.closeTime) : null,
         });
       } else {
         if (!activeJournal) return;
@@ -315,8 +343,49 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
             </div>
           </Field>
 
-          {/* ── Prices row ── */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* ── Entry Date & Time ── */}
+          <Field label="Entry Date & Time" required error={errors.entryDate ?? errors.entryTime}>
+            <div className="flex gap-2">
+              <DatePicker
+                value={form.entryDate}
+                onChange={v => set('entryDate', v)}
+                error={!!errors.entryDate}
+                tabIndex={4}
+              />
+              <TimePicker
+                value={form.entryTime}
+                onChange={v => set('entryTime', v)}
+                error={!!errors.entryTime}
+                tabIndex={5}
+              />
+            </div>
+          </Field>
+
+          {/* ── Close Date & Time ── */}
+          <Field label="Close Date & Time" error={errors.closeDate ?? errors.closeTime}>
+            <div className="flex gap-2">
+              <DatePicker
+                value={form.closeDate}
+                onChange={v => set('closeDate', v)}
+                disabled={form.result === TradeResult.Open}
+                error={!!errors.closeDate}
+                tabIndex={6}
+              />
+              <TimePicker
+                value={form.closeTime}
+                onChange={v => set('closeTime', v)}
+                disabled={form.result === TradeResult.Open}
+                error={!!errors.closeTime}
+                tabIndex={7}
+              />
+            </div>
+            {form.result === TradeResult.Open && (
+              <p className="text-[11px] text-text-tertiary">Trade open — will be recorded on close</p>
+            )}
+          </Field>
+
+          {/* ── Prices grid ── */}
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Entry Price" required error={errors.entryPrice}>
               <input
                 type="number"
@@ -326,7 +395,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
                 value={form.entryPrice}
                 onChange={e => set('entryPrice', e.target.value)}
                 className={inputClass(errors.entryPrice)}
-                tabIndex={4}
+                tabIndex={8}
               />
             </Field>
             <Field label="Stop Loss" required error={errors.stopLoss}>
@@ -338,7 +407,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
                 value={form.stopLoss}
                 onChange={e => set('stopLoss', e.target.value)}
                 className={inputClass(errors.stopLoss)}
-                tabIndex={5}
+                tabIndex={9}
               />
             </Field>
             <Field label="Take Profit" error={errors.takeProfit}>
@@ -350,7 +419,19 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
                 value={form.takeProfit}
                 onChange={e => set('takeProfit', e.target.value)}
                 className={inputClass(errors.takeProfit)}
-                tabIndex={6}
+                tabIndex={10}
+              />
+            </Field>
+            <Field label="Exit Price" error={errors.exitPrice}>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                placeholder="0.00 (opt)"
+                value={form.exitPrice}
+                onChange={e => set('exitPrice', e.target.value)}
+                className={inputClass(errors.exitPrice)}
+                tabIndex={11}
               />
             </Field>
           </div>
@@ -405,7 +486,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
               value={form.pnlAmount}
               onChange={e => set('pnlAmount', e.target.value)}
               className={inputClass(errors.pnlAmount)}
-              tabIndex={8}
+              tabIndex={12}
             />
           </Field>
 
@@ -479,7 +560,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
               onChange={e => set('notes', e.target.value)}
               onKeyDown={handleNotesKeyDown}
               className={`${inputClass()} resize-none`}
-              tabIndex={9}
+              tabIndex={13}
             />
             <p className="text-[11px] text-text-tertiary -mt-0.5">Ctrl+Enter to save</p>
           </Field>
@@ -496,7 +577,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
             <button
               type="button"
               onClick={onClose}
-              tabIndex={10}
+              tabIndex={14}
               className="flex-1 py-3 rounded-[12px] border border-negative/60 text-negative hover:bg-negative/10 font-semibold text-[14px] transition-colors"
             >
               Cancel
@@ -505,7 +586,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
               type="button"
               onClick={handleSubmit}
               disabled={!isFormValid || saving || uploading}
-              tabIndex={11}
+              tabIndex={15}
               className="flex-1 py-3 rounded-[12px] bg-accent text-white font-bold text-[14px] hover:bg-accent-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? 'Saving…' : isEditMode ? 'Update Trade' : 'Save Trade'}

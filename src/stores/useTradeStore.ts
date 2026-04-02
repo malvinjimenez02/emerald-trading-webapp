@@ -38,6 +38,8 @@ interface TradeRow {
   status: string;
   notes: string | null;
   screenshot_uri: string | null;
+  entry_date: string | null;
+  close_date: string | null;
   created_at: string;
   closed_at: string | null;
 }
@@ -59,9 +61,11 @@ function mapFromSupabase(row: TradeRow): Trade {
     status: row.status as TradeStatus,
     notes: row.notes ?? undefined,
     screenshotUri: row.screenshot_uri ?? undefined,
+    entryDate: row.entry_date ?? null,
+    closeDate: row.close_date ?? null,
     createdAt: row.created_at,
     closedAt: row.closed_at ?? undefined,
-    synced: true, // Desktop: Supabase is source of truth, always synced
+    synced: true,
   };
 }
 
@@ -86,6 +90,8 @@ function mapToSupabase(
     status: trade.status,
     notes: trade.notes ?? null,
     screenshot_uri: trade.screenshotUri ?? null,
+    entry_date: trade.entryDate ?? null,
+    close_date: trade.closeDate ?? null,
     created_at: trade.createdAt,
     closed_at: trade.closedAt ?? null,
   };
@@ -105,6 +111,8 @@ function mapUpdatesToSupabase(updates: Partial<Trade>): Partial<TradeRow> {
   if (updates.status !== undefined)       row.status         = updates.status;
   if (updates.notes !== undefined)        row.notes          = updates.notes ?? null;
   if (updates.screenshotUri !== undefined) row.screenshot_uri = updates.screenshotUri ?? null;
+  if (updates.entryDate !== undefined)    row.entry_date     = updates.entryDate ?? null;
+  if (updates.closeDate !== undefined)    row.close_date     = updates.closeDate ?? null;
   if (updates.closedAt !== undefined)     row.closed_at      = updates.closedAt ?? null;
   return row;
 }
@@ -117,24 +125,24 @@ function buildTradeFromForm(
   const entryPrice = parseFloat(form.entryPrice);
   const stopLoss   = parseFloat(form.stopLoss);
   const takeProfit = form.takeProfit ? parseFloat(form.takeProfit) : undefined;
+  const exitPrice  = form.exitPrice  ? parseFloat(form.exitPrice)  : undefined;
   const pnlAmount  = form.pnlAmount  ? parseFloat(form.pnlAmount)  : undefined;
 
   const isClosed = form.result !== TradeResult.Open;
 
-  // R is not calculable without exitPrice; will be set on close via updateTrade
+  const entryDateISO = combineDatetime(form.entryDate, form.entryTime);
+  const closeDateISO = isClosed ? combineDatetime(form.closeDate, form.closeTime) : null;
+
+  // Prefer geometry-based R (exit price) over PnL-based estimation
   let rValue: number | undefined;
-  if (isClosed && pnlAmount !== undefined && !isNaN(pnlAmount)) {
+  if (exitPrice !== undefined && !isNaN(exitPrice)) {
+    const computed = calculateR(form.direction, entryPrice, exitPrice, stopLoss);
+    if (computed !== null) rValue = computed;
+  } else if (isClosed && pnlAmount !== undefined && !isNaN(pnlAmount)) {
     const riskPerTrade = 100; // default; overridden by journal config in metrics
     rValue = form.result === TradeResult.Win
       ? Math.abs(pnlAmount) / riskPerTrade
       : -(Math.abs(pnlAmount) / riskPerTrade);
-  }
-
-  // Try to compute R from entry/stop geometry if available
-  const exitViaCalc = undefined; // no exitPrice field in TradeFormData yet
-  if (exitViaCalc !== undefined) {
-    const computed = calculateR(form.direction, entryPrice, exitViaCalc, stopLoss);
-    if (computed !== null) rValue = computed;
   }
 
   return {
@@ -144,17 +152,27 @@ function buildTradeFromForm(
     entryPrice,
     stopLoss,
     takeProfit: takeProfit !== undefined && !isNaN(takeProfit) ? takeProfit : undefined,
-    exitPrice: undefined,
+    exitPrice: exitPrice !== undefined && !isNaN(exitPrice) ? exitPrice : undefined,
     result: form.result,
     rValue,
     pnlAmount: pnlAmount !== undefined && !isNaN(pnlAmount) ? pnlAmount : undefined,
     status: isClosed ? TradeStatus.Closed : TradeStatus.Open,
     notes: form.notes || undefined,
     screenshotUri: form.screenshotUri || undefined,
+    entryDate: entryDateISO,
+    closeDate: closeDateISO,
     createdAt: new Date().toISOString(),
     closedAt: isClosed ? new Date().toISOString() : undefined,
     synced: true,
   };
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function combineDatetime(date: string, time: string): string | null {
+  if (!date) return null;
+  const d = new Date(`${date}T${time || '00:00'}:00`);
+  return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 // ─── Journal config fetch ─────────────────────────────────────────────────────

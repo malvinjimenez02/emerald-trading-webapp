@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Calendar, Clock, BookOpen } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Calendar, Clock, BookOpen, X, ZoomIn } from 'lucide-react';
 import { useTradeStore } from '../stores/useTradeStore';
 import { useJournalStore } from '../stores/useJournalStore';
 import { supabase } from '../services/supabase';
@@ -12,13 +12,36 @@ import { formatCurrency, formatDateTime } from '../utils/formatters';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function splitISODatetime(iso: string | null | undefined): { date: string; time: string } {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (!iso) {
+    return {
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    };
+  }
+  const d = new Date(iso);
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
 function tradeToFormData(t: Trade): TradeFormData {
+  const entry = splitISODatetime(t.entryDate);
+  const close = splitISODatetime(t.closeDate ?? t.closedAt);
   return {
     assetName:    t.assetName,
     direction:    t.direction,
+    entryDate:    entry.date,
+    entryTime:    entry.time,
+    closeDate:    close.date,
+    closeTime:    close.time,
     entryPrice:   String(t.entryPrice),
     stopLoss:     String(t.stopLoss),
     takeProfit:   t.takeProfit != null ? String(t.takeProfit) : '',
+    exitPrice:    t.exitPrice != null ? String(t.exitPrice) : '',
     result:       t.result,
     pnlAmount:    t.pnlAmount != null ? String(t.pnlAmount) : '',
     notes:        t.notes ?? '',
@@ -92,8 +115,9 @@ export const TradeDetailPage: React.FC = () => {
 
   const [trade, setTrade]           = useState<Trade | null>(null);
   const [loadingFetch, setLoading]  = useState(false);
-  const [showEdit, setShowEdit]     = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
+  const [showEdit, setShowEdit]         = useState(false);
+  const [showDelete, setShowDelete]     = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Try store first, then fetch from Supabase
   useEffect(() => {
@@ -120,6 +144,8 @@ export const TradeDetailPage: React.FC = () => {
         status:       d.status as TradeStatus,
         notes:        d.notes as string ?? undefined,
         screenshotUri: d.screenshot_uri as string ?? undefined,
+        entryDate:    d.entry_date as string ?? null,
+        closeDate:    d.close_date as string ?? null,
         createdAt:    d.created_at as string,
         closedAt:     d.closed_at as string ?? undefined,
         synced:       true,
@@ -134,12 +160,16 @@ export const TradeDetailPage: React.FC = () => {
     if (updated) setTrade(updated);
   }, [trades, id]);
 
-  // Escape = back
+  // Escape: close lightbox first, then go back
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !showEdit && !showDelete) navigate(-1); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (lightboxOpen) { setLightboxOpen(false); return; }
+      if (!showEdit && !showDelete) navigate(-1);
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, showEdit, showDelete]);
+  }, [navigate, showEdit, showDelete, lightboxOpen]);
 
   const handleDelete = async () => {
     if (!trade) return;
@@ -250,27 +280,41 @@ export const TradeDetailPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Screenshot — edge-to-edge, click to expand */}
+          {trade.screenshotUri && (
+            <div className="bg-bg-surface rounded-xl overflow-hidden">
+              <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+                <h2 className="text-[12px] font-semibold uppercase tracking-wider text-text-secondary">Screenshot</h2>
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  className="flex items-center gap-1.5 text-[11px] text-text-secondary hover:text-accent transition-colors"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                  Expand
+                </button>
+              </div>
+              <div
+                className="relative group cursor-zoom-in"
+                onClick={() => setLightboxOpen(true)}
+              >
+                <img
+                  src={trade.screenshotUri}
+                  alt={`${trade.assetName} trade screenshot`}
+                  className="w-full object-contain"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow-lg" />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Notes */}
           {trade.notes && (
             <div className="bg-bg-surface rounded-xl p-6">
               <h2 className="text-[12px] font-semibold uppercase tracking-wider text-text-secondary mb-3">Notes</h2>
               <p className="text-[14px] text-text leading-relaxed whitespace-pre-wrap">{trade.notes}</p>
-            </div>
-          )}
-
-          {/* Screenshot */}
-          {trade.screenshotUri && (
-            <div className="bg-bg-surface rounded-xl p-6">
-              <h2 className="text-[12px] font-semibold uppercase tracking-wider text-text-secondary mb-3">Screenshot</h2>
-              <img
-                src={trade.screenshotUri}
-                alt={`${trade.assetName} trade screenshot`}
-                className="w-full rounded-xl border border-divider object-contain max-h-[480px]"
-                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              />
-              <p className="text-[11px] text-text-tertiary mt-2">
-                Screenshot only visible if stored in Supabase Storage.
-              </p>
             </div>
           )}
         </div>
@@ -283,14 +327,14 @@ export const TradeDetailPage: React.FC = () => {
             <h2 className="text-[12px] font-semibold uppercase tracking-wider text-text-secondary mb-2">Details</h2>
             <InfoRow
               icon={<Calendar className="w-4 h-4" />}
-              label="Opened"
-              value={formatDateTime(trade.createdAt)}
+              label="Entry"
+              value={formatDateTime(trade.entryDate ?? trade.createdAt)}
             />
-            {trade.closedAt && (
+            {(trade.closeDate ?? trade.closedAt) && (
               <InfoRow
                 icon={<Clock className="w-4 h-4" />}
-                label="Closed"
-                value={formatDateTime(trade.closedAt)}
+                label="Close"
+                value={formatDateTime((trade.closeDate ?? trade.closedAt)!)}
               />
             )}
             <InfoRow
@@ -358,6 +402,28 @@ export const TradeDetailPage: React.FC = () => {
           onConfirm={handleDelete}
           onCancel={() => setShowDelete(false)}
         />
+      )}
+
+      {/* ── Screenshot lightbox ── */}
+      {lightboxOpen && trade.screenshotUri && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm cursor-zoom-out"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-5 right-5 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-10"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={trade.screenshotUri}
+            alt={`${trade.assetName} trade screenshot`}
+            className="max-w-[95vw] max-h-[95vh] object-contain rounded-xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
