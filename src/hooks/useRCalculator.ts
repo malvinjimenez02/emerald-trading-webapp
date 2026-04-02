@@ -1,4 +1,3 @@
-import { TradeResult } from '../types/trade';
 
 interface RCalculatorResult {
   oneR: number | null           // valor absoluto de 1R en puntos/pips
