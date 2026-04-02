@@ -22,11 +22,13 @@ import {
   calculateExpectancy,
   avgWinLoss,
   calculateMetrics,
+  getTradeSignedPnl,
 } from '../utils/calculations';
 import { StopDisciplineCard } from '../components/analysis/StopDisciplineCard';
+import { RRComparisonCard } from '../components/analysis/RRComparisonCard';
 import { journalToConfig } from '../types/account';
 import { TradeDirection } from '../types/trade';
-import { formatDate } from '../utils/formatters';
+import { formatDate, getTradeDate } from '../utils/formatters';
 
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +139,7 @@ function getDayState(
   startDate: string | null,
   endDate: string | null,
   trades: import('../types/trade').Trade[],
+  riskPerTrade: number,
 ): DayState {
   const isInRange =
     !startDate || !endDate ||
@@ -145,10 +148,10 @@ function getDayState(
 
   if (!isInRange) return { state: 'dimmed' };
 
-  const dayTrades = trades.filter(t => dayjs(t.createdAt).isSame(dayDate, 'day'));
+  const dayTrades = trades.filter(t => dayjs(getTradeDate(t)).isSame(dayDate, 'day'));
   if (dayTrades.length === 0) return { state: 'active-empty' };
 
-  const netPnl = dayTrades.reduce((sum, t) => sum + (t.pnlAmount ?? 0), 0);
+  const netPnl = dayTrades.reduce((sum, t) => sum + getTradeSignedPnl(t, riskPerTrade), 0);
   return {
     state: netPnl >= 0 ? 'active-win' : 'active-loss',
     pnl: netPnl,
@@ -159,11 +162,12 @@ function getDayState(
 interface TradingDaysProps {
   trades:    import('../types/trade').Trade[];
   currency:  string;
+  riskPerTrade: number;
   startDate: string | null;
   endDate:   string | null;
 }
 
-const TradingDays: React.FC<TradingDaysProps> = ({ trades, currency, startDate, endDate }) => {
+const TradingDays: React.FC<TradingDaysProps> = ({ trades, currency, riskPerTrade, startDate, endDate }) => {
   const today = dayjs();
 
   // Use endDate's month as the "home" month so the most recent period is shown.
@@ -241,7 +245,7 @@ const TradingDays: React.FC<TradingDaysProps> = ({ trades, currency, startDate, 
         let weekPnl = 0; let weekCount = 0; let weekHasRange = false;
         week.forEach(day => {
           if (day === null) return;
-          const s = getDayState(currentMonth.date(day), startDate, endDate, trades);
+          const s = getDayState(currentMonth.date(day), startDate, endDate, trades, riskPerTrade);
           if (s.state !== 'dimmed') weekHasRange = true;
           if (s.state === 'active-win' || s.state === 'active-loss') {
             weekPnl += s.pnl; weekCount += s.count;
@@ -256,7 +260,7 @@ const TradingDays: React.FC<TradingDaysProps> = ({ trades, currency, startDate, 
                 return <div key={`pad-${di}`} className="rounded-lg" style={{ minHeight: 56 }} />;
               }
               const dayDate = currentMonth.date(day);
-              const s = getDayState(dayDate, startDate, endDate, trades);
+              const s = getDayState(dayDate, startDate, endDate, trades, riskPerTrade);
 
               if (s.state === 'dimmed') {
                 return (
@@ -387,10 +391,10 @@ export const AnalysisPage: React.FC = () => {
 
   const closedTrades = trades.filter(t => t.status === 'closed');
   const earliest = closedTrades.length
-    ? formatDate([...closedTrades].sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0].createdAt)
+    ? formatDate(getTradeDate([...closedTrades].sort((a, b) => getTradeDate(a).localeCompare(getTradeDate(b)))[0]))
     : null;
   const latest = closedTrades.length
-    ? formatDate([...closedTrades].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].createdAt)
+    ? formatDate(getTradeDate([...closedTrades].sort((a, b) => getTradeDate(b).localeCompare(getTradeDate(a)))[0]))
     : null;
 
   const expPos = expectancy >= 0;
@@ -415,7 +419,10 @@ export const AnalysisPage: React.FC = () => {
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
           Performance Insights
         </h2>
-        <StopDisciplineCard trades={trades} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <StopDisciplineCard trades={trades} />
+          <RRComparisonCard trades={trades} />
+        </div>
       </div>
 
       {/* ── Main grid ── */}
@@ -433,7 +440,13 @@ export const AnalysisPage: React.FC = () => {
           </Card>
 
           <Card title="Trading Days">
-            <TradingDays trades={trades} currency={config.currency} startDate={startDate} endDate={endDate} />
+            <TradingDays 
+              trades={trades} 
+              currency={config.currency} 
+              riskPerTrade={config.riskPerTrade}
+              startDate={startDate} 
+              endDate={endDate} 
+            />
           </Card>
 
         </div>

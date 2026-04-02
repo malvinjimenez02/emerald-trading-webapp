@@ -5,6 +5,8 @@ import isBetween from 'dayjs/plugin/isBetween';
 import type { Trade } from '../types/trade';
 
 // Extend dayjs with necessary plugins
+import { getTradeDate } from '../utils/formatters';
+
 dayjs.extend(isoWeek);
 dayjs.extend(isBetween);
 
@@ -96,7 +98,8 @@ export const useDateFilterStore = create<DateFilterState>((set, get) => ({
     const end = dayjs(endDate);
 
     return trades.filter((trade) => {
-      const tradeDate = dayjs(trade.createdAt);
+      const tradeDate = dayjs(getTradeDate(trade));
+      
       // Use isBetween with inclusive bounds '[]'
       return tradeDate.isBetween(start, end, null, '[]');
     });

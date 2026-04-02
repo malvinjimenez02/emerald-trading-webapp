@@ -19,7 +19,7 @@ import { useDateFilterStore } from '../stores/useDateFilterStore';
 import { ActiveFilterBanner } from '../components/layout/ActiveFilterBanner';
 import type { Trade } from '../types/trade';
 import { TradeDirection, TradeResult } from '../types/trade';
-import { formatCurrency, formatDate } from '../utils/formatters';
+import { formatCurrency, formatDate, getTradeCloseDate } from '../utils/formatters';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ export const HistoryPage: React.FC = () => {
   const { getFilteredTrades, preset, startDate, endDate } = useDateFilterStore();
 
   const [filters, setFilters]           = useState<Filters>(EMPTY_FILTERS);
-  const [sorting, setSorting]           = useState<SortingState>([{ id: 'createdAt', desc: true }]);
+  const [sorting, setSorting]           = useState<SortingState>([{ id: 'date', desc: true }]);
   const [columnFilters]                 = useState<ColumnFiltersState>([]);
   const [deleteTarget, setDeleteTarget] = useState<Trade | null>(null);
 
@@ -203,13 +203,11 @@ export const HistoryPage: React.FC = () => {
       cell: info => <RBadge result={info.getValue()} />,
     }),
 
-    col.accessor('createdAt', {
-      id: 'createdAt',
+    col.accessor(t => getTradeCloseDate(t), {
+      id: 'date',
       header: 'Date',
-      cell: info => {
-        const date = info.row.original.entryDate ?? info.getValue();
-        return <span className="text-text-secondary">{formatDate(date)}</span>;
-      },
+      cell: info => <span className="text-text-secondary">{formatDate(info.getValue())}</span>,
+      sortingFn: 'datetime',
     }),
 
     col.display({

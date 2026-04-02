@@ -2,8 +2,17 @@
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import type { Trade } from '../types/trade';
 
 dayjs.extend(relativeTime);
+
+export function getTradeDate(trade: Trade): string {
+  return trade.entryDate ?? trade.createdAt;
+}
+
+export function getTradeCloseDate(trade: Trade): string {
+  return trade.closeDate ?? trade.closedAt ?? getTradeDate(trade);
+}
 
 export function formatCurrency(
   value: number,
@@ -34,7 +43,7 @@ export function formatDate(isoString: string, format: string = 'MMM D, YYYY'): s
 }
 
 export function formatDateTime(isoString: string): string {
-  return dayjs(isoString).format('MMM D, YYYY HH:mm');
+  return dayjs(isoString).format('MMM D, YYYY h:mm A');
 }
 
 export function formatRelativeTime(isoString: string): string {

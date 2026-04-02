@@ -11,7 +11,7 @@ import type { Trade } from '../types/trade';
 import { TradeResult, TradeStatus } from '../types/trade';
 import { journalToConfig } from '../types/account';
 import { calculateMetrics } from '../utils/calculations';
-import { formatCurrency, formatRelativeTime } from '../utils/formatters';
+import { formatCurrency, formatDate, getTradeDate } from '../utils/formatters';
 
 // ─── Recent Trades mini-list ──────────────────────────────────────────────────
 
@@ -74,8 +74,8 @@ const RecentTrades: React.FC<{ trades: Trade[] }> = ({ trades }) => {
                   <span className={`text-[13px] font-semibold tabular-nums ${isWin ? 'text-positive' : 'text-negative'}`}>
                     {rLabel}
                   </span>
-                  <span className="text-[11px] text-text-secondary w-[56px] text-right">
-                    {formatRelativeTime(trade.closedAt ?? trade.createdAt)}
+                  <span className="text-[11px] text-text-secondary w-[64px] text-right">
+                    {formatDate(getTradeDate(trade), 'MMM D')}
                   </span>
                 </div>
               </div>

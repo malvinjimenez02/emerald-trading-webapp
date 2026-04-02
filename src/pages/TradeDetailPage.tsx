@@ -9,6 +9,8 @@ import type { Trade } from '../types/trade';
 import { TradeDirection, TradeResult, TradeStatus } from '../types/trade';
 import type { TradeFormData } from '../types/trade';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
+import { getTradeSignedPnl, getTradeSignedR } from '../utils/calculations';
+import { journalToConfig } from '../types/account';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -201,10 +203,11 @@ export const TradeDetailPage: React.FC = () => {
   // ── Derived values ─────────────────────────────────────────────────────────
 
   const currency   = activeJournal?.currency ?? 'USD';
-  const pnl        = trade.pnlAmount;
-  const rVal       = trade.rValue;
-  const isPnlPos   = (pnl ?? 0) >= 0;
-  const isRPos     = (rVal ?? 0) >= 0;
+  const config     = activeJournal ? journalToConfig(activeJournal) : { riskPerTrade: 100 };
+  const pnl        = getTradeSignedPnl(trade, config.riskPerTrade);
+  const rVal       = getTradeSignedR(trade);
+  const isPnlPos   = pnl >= 0;
+  const isRPos     = rVal >= 0;
   const res        = resultConfig[trade.result];
   const dir        = dirConfig[trade.direction];
   const isClosed   = trade.status === TradeStatus.Closed;

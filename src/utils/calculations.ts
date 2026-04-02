@@ -2,6 +2,19 @@ import type { Trade } from '../types/trade';
 import { TradeDirection, TradeResult, TradeStatus } from '../types/trade';
 import type { AccountConfig } from '../types/account';
 import type { JournalMetrics, EquityPoint } from '../types/metrics';
+import { getTradeDate, getTradeCloseDate } from './formatters';
+
+export function getTradeSignedPnl(trade: Trade, riskPerTrade: number = 100): number {
+  const amt = trade.pnlAmount ?? (trade.rValue ?? 0) * riskPerTrade;
+  if (trade.result === TradeResult.Open) return amt;
+  return trade.result === TradeResult.Win ? Math.abs(amt) : -Math.abs(amt);
+}
+
+export function getTradeSignedR(trade: Trade): number {
+  const r = trade.rValue ?? 0;
+  if (trade.result === TradeResult.Open) return r;
+  return trade.result === TradeResult.Win ? Math.abs(r) : -Math.abs(r);
+}
 
 export function calculateR(
   direction: TradeDirection,
@@ -42,10 +55,7 @@ export function calculateMetrics(trades: Trade[], config: AccountConfig): Journa
   const hasPnl = closed.some(t => t.pnlAmount != null);
   let netPnl: number;
   if (hasPnl) {
-    netPnl = closed.reduce((sum, t) => {
-      const amt = t.pnlAmount ?? (t.rValue ?? 0) * config.riskPerTrade;
-      return sum + (t.result === TradeResult.Win ? amt : -Math.abs(amt));
-    }, 0);
+    netPnl = closed.reduce((sum, t) => sum + getTradeSignedPnl(t, config.riskPerTrade), 0);
   } else {
     netPnl = totalRProfit * config.riskPerTrade;
   }
@@ -77,12 +87,12 @@ function getISOWeek(dateStr: string): string {
 
 function buildEquityCurve(closed: Trade[]): EquityPoint[] {
   const sorted = [...closed].sort(
-    (a, b) => new Date(a.entryDate ?? a.createdAt).getTime() - new Date(b.entryDate ?? b.createdAt).getTime()
+    (a, b) => new Date(getTradeDate(a)).getTime() - new Date(getTradeDate(b)).getTime()
   );
 
   const weekMap = new Map<string, number>();
   for (const trade of sorted) {
-    const week = getISOWeek(trade.closeDate ?? trade.closedAt ?? trade.createdAt);
+    const week = getISOWeek(getTradeCloseDate(trade));
     weekMap.set(week, (weekMap.get(week) ?? 0) + (trade.rValue ?? 0));
   }
 
@@ -171,7 +181,7 @@ export function tradesByDay(trades: Trade[]): DayStats[] {
   const closed = trades.filter(t => t.status === TradeStatus.Closed);
   return days.map(({ day, short }) => {
     const group = closed.filter(t => {
-      const d = new Date(t.entryDate ?? t.createdAt).getDay(); // 1=Mon…5=Fri
+      const d = new Date(getTradeDate(t)).getDay(); // 1=Mon…5=Fri
       return d === ['Monday','Tuesday','Wednesday','Thursday','Friday'].indexOf(day) + 1;
     });
     const wins = group.filter(t => t.result === TradeResult.Win);
@@ -190,7 +200,7 @@ export function tradesByCalendarDay(trades: Trade[]): CalendarDayStats[] {
   const closed = trades.filter(t => t.status === TradeStatus.Closed);
   const map = new Map<string, CalendarDayStats>();
   for (const t of closed) {
-    const key = (t.closeDate ?? t.closedAt ?? t.createdAt).slice(0, 10);
+    const key = getTradeCloseDate(t).slice(0, 10);
     const existing = map.get(key) ?? { dateKey: key, pnl: 0, total: 0 };
     existing.pnl   += t.pnlAmount ?? 0;
     existing.total += 1;
@@ -206,7 +216,7 @@ export interface StreakResult {
 
 export function calculateStreaks(trades: Trade[]): StreakResult {
   const closed = [...trades.filter(t => t.status === TradeStatus.Closed)]
-    .sort((a, b) => new Date(a.entryDate ?? a.createdAt).getTime() - new Date(b.entryDate ?? b.createdAt).getTime());
+    .sort((a, b) => new Date(getTradeDate(a)).getTime() - new Date(getTradeDate(b)).getTime());
   let bestWin = 0, worstLoss = 0, curWin = 0, curLoss = 0;
   for (const t of closed) {
     if (t.result === TradeResult.Win) {
@@ -303,5 +313,58 @@ function emptyMetrics(config: AccountConfig): JournalMetrics {
     accountValue: config.initialCapital,
     percentageChange: 0,
     equityCurve: [],
+  };
+}
+
+export interface RRComparison {
+  avgRRPlanned: number;
+  avgRRExecuted: number;
+  executionRatio: number;
+  validTrades: number;
+  isUndercutting: boolean;
+}
+
+export function calculateRRComparison(trades: Trade[]): RRComparison | null {
+  const validTradesList = trades.filter(t => 
+    t.status === TradeStatus.Closed &&
+    t.takeProfit != null &&
+    t.exitPrice != null &&
+    t.entryPrice != null &&
+    t.stopLoss != null &&
+    (t.result === TradeResult.Win || t.result === TradeResult.Loss)
+  );
+
+  if (validTradesList.length < 3) return null;
+
+  let totalRRPlanned = 0;
+  let totalRRExecuted = 0;
+
+  for (const t of validTradesList) {
+    const isLong = t.direction === TradeDirection.Long;
+    const risk = Math.abs(t.entryPrice - t.stopLoss);
+    if (risk === 0) continue;
+
+    const rrPlanned = isLong
+      ? (t.takeProfit! - t.entryPrice) / risk
+      : (t.entryPrice - t.takeProfit!) / risk;
+
+    const rrExecuted = isLong
+      ? (t.exitPrice! - t.entryPrice) / risk
+      : (t.entryPrice - t.exitPrice!) / risk;
+
+    totalRRPlanned += rrPlanned;
+    totalRRExecuted += rrExecuted;
+  }
+
+  const avgRRPlanned = totalRRPlanned / validTradesList.length;
+  const avgRRExecuted = totalRRExecuted / validTradesList.length;
+  const executionRatio = (avgRRExecuted / avgRRPlanned) * 100;
+
+  return {
+    avgRRPlanned,
+    avgRRExecuted,
+    executionRatio,
+    validTrades: validTradesList.length,
+    isUndercutting: executionRatio < 70,
   };
 }
