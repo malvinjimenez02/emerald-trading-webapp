@@ -23,6 +23,7 @@ import {
   avgWinLoss,
   calculateMetrics,
 } from '../utils/calculations';
+import { StopDisciplineCard } from '../components/analysis/StopDisciplineCard';
 import { journalToConfig } from '../types/account';
 import { TradeDirection } from '../types/trade';
 import { formatDate } from '../utils/formatters';
@@ -408,6 +409,14 @@ export const AnalysisPage: React.FC = () => {
       </div>
 
       <ActiveFilterBanner />
+
+      {/* ── Performance Insights ── */}
+      <div className="flex flex-col gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+          Performance Insights
+        </h2>
+        <StopDisciplineCard trades={trades} />
+      </div>
 
       {/* ── Main grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

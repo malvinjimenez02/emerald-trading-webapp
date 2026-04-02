@@ -271,6 +271,29 @@ export function avgWinLoss(trades: Trade[]): { avgWinR: number; avgLossR: number
   };
 }
 
+export interface StopDiscipline {
+  avgLossR: number;
+  deviation: number;
+  totalLosses: number;
+  status: 'excellent' | 'acceptable' | 'poor';
+}
+
+export function calculateStopDiscipline(trades: Trade[]): StopDiscipline {
+  const losses = trades.filter(
+    t => t.status === TradeStatus.Closed && t.result === TradeResult.Loss && t.rValue != null
+  );
+
+  if (losses.length === 0) {
+    return { avgLossR: 0, deviation: 0, totalLosses: 0, status: 'excellent' };
+  }
+
+  const avgLossR   = losses.reduce((s, t) => s + (t.rValue ?? 0), 0) / losses.length;
+  const deviation  = avgLossR + 1.0;
+  const status     = deviation >= -0.1 ? 'excellent' : deviation >= -0.5 ? 'acceptable' : 'poor';
+
+  return { avgLossR, deviation, totalLosses: losses.length, status };
+}
+
 function emptyMetrics(config: AccountConfig): JournalMetrics {
   return {
     totalTrades: 0,

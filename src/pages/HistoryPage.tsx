@@ -19,7 +19,7 @@ import { useDateFilterStore } from '../stores/useDateFilterStore';
 import { ActiveFilterBanner } from '../components/layout/ActiveFilterBanner';
 import type { Trade } from '../types/trade';
 import { TradeDirection, TradeResult } from '../types/trade';
-import { formatCurrency, formatRelativeTime } from '../utils/formatters';
+import { formatCurrency, formatDate } from '../utils/formatters';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -171,10 +171,12 @@ export const HistoryPage: React.FC = () => {
       cell: info => {
         const v = info.getValue();
         if (v == null) return <span className="text-text-secondary">—</span>;
-        const pos = v >= 0;
+        const isLoss = info.row.original.result === TradeResult.Loss;
+        const display = isLoss ? -Math.abs(v) : v;
+        const pos = display >= 0;
         return (
           <span className={`tabular-nums font-semibold ${pos ? 'text-positive' : 'text-negative'}`}>
-            {pos ? '+' : ''}{v.toFixed(2)}R
+            {pos ? '+' : ''}{display.toFixed(2)}R
           </span>
         );
       },
@@ -185,10 +187,12 @@ export const HistoryPage: React.FC = () => {
       cell: info => {
         const v = info.getValue();
         if (v == null) return <span className="text-text-secondary">—</span>;
-        const pos = v >= 0;
+        const isLoss = info.row.original.result === TradeResult.Loss;
+        const display = isLoss ? -Math.abs(v) : Math.abs(v);
+        const pos = display >= 0;
         return (
           <span className={`tabular-nums font-semibold ${pos ? 'text-positive' : 'text-negative'}`}>
-            {pos ? '+' : ''}{formatCurrency(v)}
+            {pos ? '+' : ''}{formatCurrency(display)}
           </span>
         );
       },
@@ -202,7 +206,10 @@ export const HistoryPage: React.FC = () => {
     col.accessor('createdAt', {
       id: 'createdAt',
       header: 'Date',
-      cell: info => <span className="text-text-secondary">{formatRelativeTime(info.getValue())}</span>,
+      cell: info => {
+        const date = info.row.original.entryDate ?? info.getValue();
+        return <span className="text-text-secondary">{formatDate(date)}</span>;
+      },
     }),
 
     col.display({
