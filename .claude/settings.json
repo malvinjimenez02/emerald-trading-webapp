@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node validate-date-filter.mjs)"
+      "Bash(node validate-date-filter.mjs)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm --version)",
+      "Bash(uipro init:*)",
+      "Bash(uipro --help)",
+      "Bash(where python:*)",
+      "Bash(py --version)",
+      "Bash(python c:/Users/nuevoadmin/Desktop/emerald-desktop/.claude/skills/ui-ux-pro-max/scripts/search.py \"trading dashboard analytics SaaS dark mode\" --design-system)",
+      "Bash(C:/Users/nuevoadmin/AppData/Local/Microsoft/WindowsApps/python.exe c:/Users/nuevoadmin/Desktop/emerald-desktop/.claude/skills/ui-ux-pro-max/scripts/search.py \"trading journal analytics SaaS dark mode metrics kpi\" --design-system)"
     ]
   }
 }

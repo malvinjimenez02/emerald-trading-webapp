@@ -13,7 +13,7 @@ import {
   LogOut,
   Check,
 } from 'lucide-react';
-import LogoIcon from '../../assets/Emerald-loading.svg';
+// import LogoIcon from '../../assets/Emerald-loading.svg'; // Removed as we inline the new logo
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useJournalStore } from '../../stores/useJournalStore';
 import { TradeForm } from '../trade/TradeForm';
@@ -131,18 +131,34 @@ export const Sidebar: React.FC = () => {
         )}
         {/* Brand / Logo */}
         <div className={`flex items-center h-16 border-b border-divider/50 shrink-0 transition-all ${isCollapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
-          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-            <img
-              src={LogoIcon}
-              alt="Emerald"
-              className="w-8 h-8 shrink-0 object-contain"
-            />
+          <NavLink
+            to="/"
+            style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}
+            className="min-w-0 overflow-hidden"
+          >
+            <div style={{
+              width: "32px",
+              height: "32px",
+              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 0 16px rgba(34,197,94,0.4)",
+            }} className="shrink-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <g transform="translate(1, 1) scale(0.92)">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                  <polyline points="16 7 22 7 22 13" />
+                </g>
+              </svg>
+            </div>
             {!isCollapsed && (
               <span className="text-[18px] font-[500] tracking-[-0.5px] text-white whitespace-nowrap">
                 EMERALD
               </span>
             )}
-          </div>
+          </NavLink>
           {!isCollapsed && (
             <button
               onClick={() => setIsCollapsed(true)}

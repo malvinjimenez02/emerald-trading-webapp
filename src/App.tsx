@@ -9,7 +9,6 @@ import { TradeDetailPage } from './pages/TradeDetailPage';
 import { AnalysisPage } from './pages/AnalysisPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useAuthStore } from './stores/useAuthStore';
-import LoadingLogo from './assets/Emerald-loading.svg';
 import './App.css';
 
 // Protected Route Wrapper
@@ -34,9 +33,9 @@ function App() {
         
         <div className="relative z-10 flex flex-col items-center">
           <img 
-            src={LoadingLogo} 
+            src="/header-logo.svg" 
             alt="Loading..." 
-            className="w-16 h-16 animate-pulse mb-8 drop-shadow-[0_0_20px_rgba(0,200,83,0.3)]" 
+            className="w-10 h-10 animate-pulse mb-8 drop-shadow-[0_0_20px_rgba(0,200,83,0.3)]" 
           />
           <div className="w-10 h-10 border-[3px] border-accent/20 border-t-accent rounded-full animate-spin"></div>
         </div>

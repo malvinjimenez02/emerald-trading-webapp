@@ -29,7 +29,7 @@ const STATUS_BG: Record<VisualStatus, string> = {
 const STATUS_BADGE: Record<VisualStatus, string> = {
   good:    'Buena ejecución',
   warning: 'Mejora posible',
-  danger:  'Cortando winners',
+  danger:  'Cortando ganancias',
 };
 
 // ─── RRComparisonCard ─────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ export const RRComparisonCard: React.FC<Props> = ({ trades }) => {
         <p style={{ fontSize: 11, color: '#747D8A', lineHeight: 1.5, margin: 0 }}>
           {isUndercutting ? (
             <>
-              Estás cerrando winners antes de tiempo. Tu plan promete{' '}
+              Estás cerrando ganancias antes de tiempo. Tu plan promete{' '}
               <strong style={{ color: '#fff', fontWeight: 500 }}>{avgRRPlanned.toFixed(2)}R</strong>
               {' '}pero ejecutas{' '}
               <strong style={{ color, fontWeight: 500 }}>{avgRRExecuted.toFixed(2)}R</strong>.
