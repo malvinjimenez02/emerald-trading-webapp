@@ -121,7 +121,9 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     // 2. No journals yet → try to create one, fall back if creation fails
     if (journals.length === 0) {
       try {
-        const defaultJournal = await get().createJournal('My Journal', 10_000, 'USD');
+        const profile = useAuthStore.getState().profile;
+        const defaultName = profile?.journal_name?.trim() || 'My Journal';
+        const defaultJournal = await get().createJournal(defaultName, 10_000, 'USD');
         const active = { ...defaultJournal, isActive: true };
         set({ journals: [active], activeJournal: active, isLoading: false });
         await useTradeStore.getState().loadTrades(defaultJournal.id);
@@ -132,7 +134,10 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     }
 
     // 3. Journals found — activate the right one
-    const active = journals.find(j => j.isActive) ?? journals[0];
+    const currentActiveId = get().activeJournal?.id;
+    const active = journals.find(j => j.id === currentActiveId)
+      ?? journals.find(j => j.isActive)
+      ?? journals[0];
     set({ journals, activeJournal: active, isLoading: false });
 
     // Migrate orphan trades to the active journal (one-time, safe to repeat)
@@ -190,35 +195,50 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     const journals = get().journals;
     const next = journals.find(j => j.id === id);
     if (!next) return;
+    if (id === get().activeJournal?.id) return;
 
-    // Deactivate all, activate the selected one
-    const { error } = await supabase
-      .from('journals')
-      .update({ is_active: false })
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('[useJournalStore] switchJournal deactivate error:', error.message);
-      throw error;
-    }
-
-    const { error: activateError } = await supabase
-      .from('journals')
-      .update({ is_active: true })
-      .eq('id', id)
-      .eq('user_id', userId);
-
-    if (activateError) {
-      console.error('[useJournalStore] switchJournal activate error:', activateError.message);
-      throw activateError;
-    }
-
+    const previous = { journals: get().journals, activeJournal: get().activeJournal };
     const updated = journals.map(j => ({ ...j, isActive: j.id === id }));
     const active = updated.find(j => j.id === id)!;
     set({ journals: updated, activeJournal: active });
 
-    // Load trades for the new active journal
+    // Reflect switch instantly in the UI while persistence completes.
     await useTradeStore.getState().loadTrades(id);
+
+    try {
+      const { error } = await supabase
+        .from('journals')
+        .update({ is_active: false })
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('[useJournalStore] switchJournal deactivate error:', error.message);
+        throw error;
+      }
+
+      const { data: activatedRows, error: activateError } = await supabase
+        .from('journals')
+        .update({ is_active: true })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select('id');
+
+      if (activateError) {
+        console.error('[useJournalStore] switchJournal activate error:', activateError.message);
+        throw activateError;
+      }
+
+      if (!activatedRows || activatedRows.length === 0) {
+        throw new Error('No journal row was updated while switching');
+      }
+    } catch (error) {
+      console.error('[useJournalStore] switchJournal persistence error:', error);
+      set(previous);
+      if (previous.activeJournal?.id) {
+        await useTradeStore.getState().loadTrades(previous.activeJournal.id);
+      }
+      throw error;
+    }
   },
 
   updateJournal: async (id, updates) => {

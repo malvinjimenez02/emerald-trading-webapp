@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { CompleteProfilePage } from './pages/CompleteProfilePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { TradeDetailPage } from './pages/TradeDetailPage';
@@ -13,13 +14,21 @@ import './App.css';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, hasCompletedProfile } = useAuthStore();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!hasCompletedProfile) return <Navigate to="/complete-profile" replace />;
+  return <>{children}</>;
+};
+
+const ProfileSetupRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, hasCompletedProfile } = useAuthStore();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (hasCompletedProfile) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
 function App() {
-  const { initialize, isLoading, isAuthenticated } = useAuthStore();
+  const { initialize, isLoading, isAuthenticated, hasCompletedProfile } = useAuthStore();
 
   useEffect(() => {
     initialize();
@@ -58,16 +67,22 @@ function App() {
 
         {/* Authenticated Routes */}
         {isAuthenticated && (
-          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/analysis" element={<AnalysisPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/trade/:id" element={<TradeDetailPage />} />
-            {/* Catch all authenticated to dashboard */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
+          <>
+            <Route
+              path="/complete-profile"
+              element={<ProfileSetupRoute><CompleteProfilePage /></ProfileSetupRoute>}
+            />
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/analysis" element={<AnalysisPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/trade/:id" element={<TradeDetailPage />} />
+            </Route>
+            {/* Catch all authenticated to profile setup or dashboard */}
+            <Route path="*" element={<Navigate to={hasCompletedProfile ? '/dashboard' : '/complete-profile'} replace />} />
+          </>
         )}
       </Routes>
     </BrowserRouter>

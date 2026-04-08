@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   BookOpen,
   Plus,
@@ -109,7 +110,7 @@ const DeleteAllModal: React.FC<{ onConfirm: () => void; onCancel: () => void; is
 
 // ─── Journals Section ─────────────────────────────────────────────────────────
 
-const JournalsSection: React.FC = () => {
+const JournalsSection: React.FC<{ autoOpenNewForm: boolean }> = ({ autoOpenNewForm }) => {
   const { journals, activeJournal, switchJournal, deleteJournal, createJournal, updateJournal } = useJournalStore();
   const [showNewForm, setShowNewForm] = useState(false);
   const [newName, setNewName] = useState('');
@@ -124,6 +125,10 @@ const JournalsSection: React.FC = () => {
   const [editCapital, setEditCapital] = useState('');
   const [editCurrency, setEditCurrency] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (autoOpenNewForm) setShowNewForm(true);
+  }, [autoOpenNewForm]);
 
   const startEdit = (j: Journal) => {
     setEditingId(j.id);
@@ -172,7 +177,13 @@ const JournalsSection: React.FC = () => {
 
   const handleSwitch = async (id: string) => {
     setSwitching(id);
-    try { await switchJournal(id); } finally { setSwitching(null); }
+    try {
+      await switchJournal(id);
+    } catch (error) {
+      console.error('[SettingsPage] switchJournal failed:', error);
+    } finally {
+      setSwitching(null);
+    }
   };
 
   const handleDelete = async (j: Journal) => {
@@ -502,18 +513,30 @@ const AboutSection: React.FC = () => {
 
 // ─── SettingsPage ─────────────────────────────────────────────────────────────
 
-export const SettingsPage: React.FC = () => (
-  <div className="space-y-5">
-    <div>
-      <h1 className="text-2xl font-bold text-text">Settings</h1>
-      <p className="text-[13px] text-text-secondary mt-1">Manage your journal, data, and account</p>
-    </div>
+export const SettingsPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoOpenNewForm = searchParams.get('newJournal') === '1';
 
-    <div className="max-w-2xl flex flex-col gap-4">
-      <JournalsSection />
-      <DataSection />
-      <SessionSection />
-      <AboutSection />
+  useEffect(() => {
+    if (!autoOpenNewForm) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('newJournal');
+    setSearchParams(nextParams, { replace: true });
+  }, [autoOpenNewForm, searchParams, setSearchParams]);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-text">Settings</h1>
+        <p className="text-[13px] text-text-secondary mt-1">Manage your journal, data, and account</p>
+      </div>
+
+      <div id="journals" className="max-w-2xl flex flex-col gap-4">
+        <JournalsSection autoOpenNewForm={autoOpenNewForm} />
+        <DataSection />
+        <SessionSection />
+        <AboutSection />
+      </div>
     </div>
-  </div>
-);
+  );
+};

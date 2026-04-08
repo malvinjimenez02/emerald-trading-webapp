@@ -4,9 +4,11 @@ import { useAuthStore } from '../../stores/useAuthStore';
 import { DateFilterDropdown } from './DateFilterDropdown';
 
 export const TopNavbar: React.FC = () => {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const userEmail = user?.email || 'user@example.com';
-  const username = userEmail.split('@')[0];
+  const username = profile
+    ? `${profile.first_name} ${profile.last_name}`.trim()
+    : userEmail.split('@')[0];
 
   return (
     <header className="h-[80px] bg-bg flex items-center justify-between px-8 border-b border-divider shrink-0 sticky top-0 z-40 relative">

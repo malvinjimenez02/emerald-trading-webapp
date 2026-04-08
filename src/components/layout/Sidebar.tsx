@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Clock,
@@ -20,11 +20,12 @@ import { TradeForm } from '../trade/TradeForm';
 
 // ─── Journal Switcher ─────────────────────────────────────────────────────────
 
-const JournalSwitcher: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) => {
+const JournalSwitcher: React.FC<{ isCollapsed: boolean; onAddJournal: () => void }> = ({ isCollapsed, onAddJournal }) => {
   const { journals, activeJournal, switchJournal } = useJournalStore();
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const hasMultipleJournals = journals.length > 1;
 
   useEffect(() => {
     if (!open) return;
@@ -38,7 +39,11 @@ const JournalSwitcher: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) =>
   const handleSwitch = async (id: string) => {
     if (id === activeJournal?.id) { setOpen(false); return; }
     setSwitching(id);
-    try { await switchJournal(id); } finally {
+    try {
+      await switchJournal(id);
+    } catch (error) {
+      console.error('[Sidebar] switchJournal failed:', error);
+    } finally {
       setSwitching(null);
       setOpen(false);
     }
@@ -60,15 +65,24 @@ const JournalSwitcher: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) =>
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center justify-between w-full p-2 rounded-[12px] hover:bg-accent/10 text-text-secondary hover:text-accent transition-colors"
+        className="w-full rounded-[12px] border border-divider/80 bg-bg/50 px-3 py-2.5 text-left text-text-secondary transition-colors hover:border-accent/40 hover:bg-accent/5 hover:text-accent"
       >
-        <div className="flex items-center gap-3 overflow-hidden">
-          <BookOpen className="w-5 h-5 shrink-0" />
-          <span className="truncate text-subhead font-medium">
-            {activeJournal?.name ?? 'Journal'}
-          </span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 rounded-[10px] border border-divider/70 bg-bg-surface/80 flex items-center justify-center shrink-0">
+              <BookOpen className="w-4 h-4 shrink-0" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-subhead font-medium text-text">
+                {activeJournal?.name ?? 'Journal'}
+              </p>
+              <p className="text-[11px] text-text-tertiary leading-tight">
+                {hasMultipleJournals ? 'Switch journal' : 'Add another journal'}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
         </div>
-        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && journals.length > 0 && (
@@ -96,6 +110,18 @@ const JournalSwitcher: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) =>
               </button>
             );
           })}
+          {!hasMultipleJournals && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                onAddJournal();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-accent hover:bg-accent/10 transition-colors border-t border-divider/50"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              <span className="text-[13px] font-medium">Add another journal</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -113,6 +139,7 @@ export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showTradeForm, setShowTradeForm] = useState(false);
   const { signOut } = useAuthStore();
+  const navigate = useNavigate();
 
   return (
     <>
@@ -203,7 +230,10 @@ export const Sidebar: React.FC = () => {
 
         {/* Footer Area: Journal Switcher & Collapse Toggle */}
         <div className="p-3 border-t border-divider shrink-0 flex flex-col gap-2">
-          <JournalSwitcher isCollapsed={isCollapsed} />
+          <JournalSwitcher
+            isCollapsed={isCollapsed}
+            onAddJournal={() => navigate('/settings?newJournal=1#journals')}
+          />
 
           <button
             onClick={() => signOut()}

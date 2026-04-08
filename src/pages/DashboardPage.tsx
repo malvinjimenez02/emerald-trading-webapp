@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { EquityChart } from '../components/dashboard/EquityChart';
+import { DashboardWalkthrough } from '../components/dashboard/DashboardWalkthrough';
 import { ActiveFilterBanner } from '../components/layout/ActiveFilterBanner';
 import { useTradeStore } from '../stores/useTradeStore';
 import { useJournalStore } from '../stores/useJournalStore';
 import { useDateFilterStore } from '../stores/useDateFilterStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import type { Trade } from '../types/trade';
 import { TradeResult, TradeStatus } from '../types/trade';
 import { journalToConfig } from '../types/account';
@@ -93,8 +95,33 @@ export const DashboardPage: React.FC = () => {
   const { trades: allTrades, isLoading } = useTradeStore();
   const { activeJournal, loadJournals }  = useJournalStore();
   const { getFilteredTrades, preset, startDate, endDate } = useDateFilterStore();
+  const { user } = useAuthStore();
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
 
   useEffect(() => { loadJournals(); }, []);
+
+  const walkthroughSessionKey = useMemo(
+    () => `emerald:dashboard:walkthrough-shown:${user?.id ?? 'guest'}`,
+    [user?.id],
+  );
+
+  useEffect(() => {
+    try {
+      const alreadyShown = sessionStorage.getItem(walkthroughSessionKey) === '1';
+      setShowWalkthrough(!alreadyShown);
+    } catch {
+      setShowWalkthrough(true);
+    }
+  }, [walkthroughSessionKey]);
+
+  const handleCloseWalkthrough = () => {
+    try {
+      sessionStorage.setItem(walkthroughSessionKey, '1');
+    } catch {
+      // noop
+    }
+    setShowWalkthrough(false);
+  };
 
   const currency = activeJournal?.currency ?? 'USD';
 
@@ -110,16 +137,26 @@ export const DashboardPage: React.FC = () => {
     () => getFilteredTrades(allTrades),
     [allTrades, preset, startDate, endDate], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const tradesForBalance = useMemo(() => {
+    if (preset === 'all_time' || !endDate) return allTrades;
+    const cutoff = new Date(endDate).getTime();
+    return allTrades.filter((trade) => new Date(getTradeDate(trade)).getTime() <= cutoff);
+  }, [allTrades, preset, endDate]);
+
   const metrics = useMemo(
     () => calculateMetrics(filteredTrades, config),
     [filteredTrades, config],
   );
+  const balanceMetrics = useMemo(
+    () => calculateMetrics(tradesForBalance, config),
+    [tradesForBalance, config],
+  );
 
   // ── Derived metric values ──────────────────────────────────────────────────
 
-  const accountValue = formatCurrency(metrics.accountValue, currency);
+  const accountValue = formatCurrency(balanceMetrics.accountValue, currency);
 
-  const pctChange = metrics.percentageChange;
+  const pctChange = balanceMetrics.percentageChange;
   const pctBadge  = `${pctChange >= 0 ? '+' : ''}${pctChange.toFixed(2)}%`;
   const pctColor  = pctChange >= 0 ? 'positive' : 'negative';
 
@@ -132,6 +169,7 @@ export const DashboardPage: React.FC = () => {
   const pfStr = pf >= 99 ? '∞' : pf.toFixed(2);
 
   return (
+    <>
     <div className="space-y-4">
       {/* ── Header ── */}
       <div className="flex items-center gap-3">
@@ -188,5 +226,7 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
     </div>
+    <DashboardWalkthrough open={showWalkthrough} onClose={handleCloseWalkthrough} />
+    </>
   );
 };
