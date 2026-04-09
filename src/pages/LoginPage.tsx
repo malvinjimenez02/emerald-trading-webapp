@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
+import { isValidEmail } from '../utils/validators';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -12,10 +13,18 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [localError, setLocalError] = useState<string | null>(null);
+
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!email || !password) return;
 
+    if (!isValidEmail(email)) {
+      setLocalError('Please enter a valid email address');
+      return;
+    }
+
+    setLocalError(null);
     setIsSubmitting(true);
     clearError();
 
@@ -138,7 +147,7 @@ export const LoginPage: React.FC = () => {
                 </div>
               </div>
 
-              {error && <p className="text-caption text-negative">{error}</p>}
+              {(localError || error) && <p className="text-caption text-negative">{localError || error}</p>}
 
               <button
                 type="submit"

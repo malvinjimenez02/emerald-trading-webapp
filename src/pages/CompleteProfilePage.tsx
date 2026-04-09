@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { validateName, validateJournalName, sanitizeIdentifier } from '../utils/validators';
 
 export const CompleteProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,14 +30,19 @@ export const CompleteProfilePage: React.FC = () => {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const cleanFirstName = firstName.trim();
-    const cleanLastName = lastName.trim();
-    const cleanJournalName = journalName.trim();
 
-    if (!cleanFirstName || !cleanLastName || !cleanJournalName) {
-      setLocalError('Please complete all fields');
-      return;
-    }
+    const firstCheck = validateName(firstName, 'First name');
+    if (!firstCheck.valid) { setLocalError(firstCheck.message ?? 'Invalid first name'); return; }
+
+    const lastCheck = validateName(lastName, 'Last name');
+    if (!lastCheck.valid) { setLocalError(lastCheck.message ?? 'Invalid last name'); return; }
+
+    const journalCheck = validateJournalName(journalName);
+    if (!journalCheck.valid) { setLocalError(journalCheck.message ?? 'Invalid journal name'); return; }
+
+    const cleanFirstName = sanitizeIdentifier(firstName, 50);
+    const cleanLastName = sanitizeIdentifier(lastName, 50);
+    const cleanJournalName = sanitizeIdentifier(journalName, 80);
 
     setLocalError(null);
     setIsSubmitting(true);

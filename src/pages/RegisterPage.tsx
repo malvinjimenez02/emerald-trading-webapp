@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
+import { isValidEmail, validatePassword } from '../utils/validators';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
@@ -17,6 +18,17 @@ export const RegisterPage: React.FC = () => {
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!email || !password || !confirmPassword) return;
+
+    if (!isValidEmail(email)) {
+      setLocalError('Please enter a valid email address');
+      return;
+    }
+
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      setLocalError(pwCheck.message ?? 'Invalid password');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setLocalError("Passwords don't match");

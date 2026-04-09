@@ -3,6 +3,62 @@ import { TradeDirection } from '../types/trade';
 import type { AccountConfig } from '../types/account';
 import { cleanParse } from './numbers';
 
+// ---------------------------------------------------------------------------
+// Input sanitization & generic validators
+// ---------------------------------------------------------------------------
+
+/** Strips leading/trailing whitespace and enforces a maximum length. */
+export function sanitizeText(value: string, maxLength = 500): string {
+  return value.trim().slice(0, maxLength);
+}
+
+/** Removes characters that are dangerous in SQL / NoSQL / template contexts. */
+export function sanitizeIdentifier(value: string, maxLength = 100): string {
+  return value
+    .trim()
+    .replace(/[<>"'`;\\]/g, '')
+    .slice(0, maxLength);
+}
+
+/** Returns true only if the string is a well-formed e-mail address. */
+export function isValidEmail(email: string): boolean {
+  const RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  return RE.test(email.trim()) && email.trim().length <= 254;
+}
+
+/**
+ * Password strength rules:
+ *   - At least 8 characters
+ *   - At least one uppercase letter
+ *   - At least one lowercase letter
+ *   - At least one digit
+ */
+export function validatePassword(password: string): { valid: boolean; message?: string } {
+  if (password.length < 8) return { valid: false, message: 'Password must be at least 8 characters' };
+  if (!/[A-Z]/.test(password)) return { valid: false, message: 'Password must contain at least one uppercase letter' };
+  if (!/[a-z]/.test(password)) return { valid: false, message: 'Password must contain at least one lowercase letter' };
+  if (!/[0-9]/.test(password)) return { valid: false, message: 'Password must contain at least one number' };
+  return { valid: true };
+}
+
+/** Validates a human name (first or last): letters, spaces, hyphens, apostrophes only. */
+export function validateName(name: string, field = 'Name'): { valid: boolean; message?: string } {
+  const clean = name.trim();
+  if (clean.length === 0) return { valid: false, message: `${field} is required` };
+  if (clean.length > 50) return { valid: false, message: `${field} must be 50 characters or less` };
+  if (!/^[\p{L}\s'\-]+$/u.test(clean)) return { valid: false, message: `${field} contains invalid characters` };
+  return { valid: true };
+}
+
+/** Validates a journal / workspace name: printable chars, no SQL-injection suspects. */
+export function validateJournalName(name: string): { valid: boolean; message?: string } {
+  const clean = name.trim();
+  if (clean.length === 0) return { valid: false, message: 'Journal name is required' };
+  if (clean.length > 80) return { valid: false, message: 'Journal name must be 80 characters or less' };
+  if (/[<>"'`;\\]/.test(clean)) return { valid: false, message: 'Journal name contains invalid characters' };
+  return { valid: true };
+}
+
 export type ValidationResult = { valid: true } | { valid: false; errors: Record<string, string> };
 
 export function validateTradeForm(input: Partial<TradeFormData>): ValidationResult {
