@@ -156,7 +156,7 @@ export const Sidebar: React.FC = () => {
   return (
     <>
       <aside
-        className={`relative z-10 flex flex-col bg-bg-surface border-r border-divider transition-all duration-300 ease-in-out ${isCollapsed ? 'w-[64px] overflow-visible' : 'w-[240px]'
+        className={`hidden md:flex relative z-10 flex-col bg-bg-surface border-r border-divider transition-all duration-300 ease-in-out ${isCollapsed ? 'w-[64px] overflow-visible' : 'w-[240px]'
           }`}
       >
         {isCollapsed && (

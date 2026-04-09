@@ -239,10 +239,10 @@ const DualCalendar: React.FC<DualCalendarProps> = ({
   );
 
   return (
-    <div style={{ minWidth: 540 }}>
-      <div className="flex gap-8">
-        {/* Left calendar */}
-        <div className="flex-1 min-w-0">
+    <div className="w-full sm:min-w-[540px]">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-8">
+        {/* Left calendar — hidden on mobile */}
+        <div className="hidden sm:block flex-1 min-w-0">
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => setRightMonth(m => m.subtract(1, 'month'))}
@@ -252,18 +252,25 @@ const DualCalendar: React.FC<DualCalendarProps> = ({
               <ChevronLeft className="w-4 h-4" />
             </button>
             {monthTitle(leftMonth)}
-            <div className="w-6" /> {/* balance spacer */}
+            <div className="w-6" />
           </div>
           <MonthGrid month={leftMonth} {...monthGridProps} />
         </div>
 
-        {/* Divider */}
-        <div className="w-px self-stretch" style={{ backgroundColor: '#30363D' }} />
+        {/* Divider — hidden on mobile */}
+        <div className="hidden sm:block w-px self-stretch" style={{ backgroundColor: '#30363D' }} />
 
-        {/* Right calendar */}
+        {/* Right calendar — full width on mobile */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-6" /> {/* balance spacer */}
+            {/* On mobile show left arrow here too */}
+            <button
+              onClick={() => setRightMonth(m => m.subtract(1, 'month'))}
+              className="p-1 rounded-md hover:bg-[#1C2333] transition-colors sm:invisible"
+              style={{ color: '#8B949E' }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
             {monthTitle(rightMonth)}
             <button
               onClick={() => setRightMonth(m => m.add(1, 'month'))}
@@ -386,11 +393,10 @@ export const DateFilterDropdown: React.FC = () => {
       {/* ── Dropdown panel ── */}
       {open && (
         <div
-          className="absolute top-full right-0 mt-2 rounded-xl border z-50 shadow-2xl overflow-hidden"
+          className={`fixed sm:absolute inset-x-4 sm:inset-x-auto top-[68px] sm:top-full sm:right-0 sm:mt-2 rounded-xl border z-50 shadow-2xl overflow-hidden ${view === 'calendar' ? 'sm:w-[560px]' : 'sm:w-[260px]'}`}
           style={{
             backgroundColor: '#161B22',
             borderColor: '#30363D',
-            minWidth: view === 'calendar' ? 'auto' : 280,
             padding: view === 'calendar' ? '16px' : '6px',
           }}
         >

@@ -168,6 +168,7 @@ export const DashboardPage: React.FC = () => {
   const pf    = metrics.profitFactor;
   const pfStr = pf >= 99 ? '∞' : pf.toFixed(2);
 
+
   return (
     <>
     <div className="space-y-4">
@@ -187,8 +188,8 @@ export const DashboardPage: React.FC = () => {
 
       <ActiveFilterBanner />
 
-      {/* ── Metric Cards (4 col) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── Metric Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <MetricCard
           label="Account Value"
           value={accountValue}
