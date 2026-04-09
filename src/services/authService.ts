@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
 
 const MISSING_CONFIG_ERROR = 'Authentication is not configured. Please contact support.';
+const APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined)?.replace(/\/+$/, '');
 
 
 export interface AuthResult {
@@ -30,9 +31,10 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 // OAuth con Google
 export async function signInWithGoogle(): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured) return { success: false, error: MISSING_CONFIG_ERROR };
+  const redirectTo = APP_URL ? `${APP_URL}/login` : `${window.location.origin}/login`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo },
   });
   if (error) return { success: false, error: error.message };
   return { success: true };
