@@ -138,8 +138,20 @@ const navItems = [
 export const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showTradeForm, setShowTradeForm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { signOut } = useAuthStore();
   const navigate = useNavigate();
+  
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <>
@@ -236,12 +248,13 @@ export const Sidebar: React.FC = () => {
           />
 
           <button
-            onClick={() => signOut()}
+            onClick={handleSignOut}
+            disabled={isSigningOut}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} w-full p-2 rounded-[12px] text-negative hover:bg-negative/10 transition-colors mt-2`}
             title="Log out"
           >
             <LogOut className="w-5 h-5 shrink-0" />
-            {!isCollapsed && <span className="ml-3 truncate text-subhead font-medium">Log Out</span>}
+            {!isCollapsed && <span className="ml-3 truncate text-subhead font-medium">{isSigningOut ? 'Logging out...' : 'Log Out'}</span>}
           </button>
 
         </div>

@@ -1,5 +1,8 @@
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 import type { Session, User } from '@supabase/supabase-js';
+
+const MISSING_CONFIG_ERROR = 'Authentication is not configured. Please contact support.';
+
 
 export interface AuthResult {
   success: boolean;
@@ -10,6 +13,7 @@ export interface AuthResult {
 
 // Registrar nuevo usuario
 export async function signUp(email: string, password: string): Promise<AuthResult> {
+  if (!isSupabaseConfigured) return { success: false, error: MISSING_CONFIG_ERROR };
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) return { success: false, error: error.message };
   return { success: true, user: data.user ?? undefined, session: data.session ?? undefined };
@@ -17,6 +21,7 @@ export async function signUp(email: string, password: string): Promise<AuthResul
 
 // Iniciar sesión
 export async function signIn(email: string, password: string): Promise<AuthResult> {
+  if (!isSupabaseConfigured) return { success: false, error: MISSING_CONFIG_ERROR };
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { success: false, error: error.message };
   return { success: true, user: data.user, session: data.session };
@@ -24,6 +29,7 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 
 // OAuth con Google
 export async function signInWithGoogle(): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) return { success: false, error: MISSING_CONFIG_ERROR };
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin },
@@ -34,9 +40,17 @@ export async function signInWithGoogle(): Promise<{ success: boolean; error?: st
 
 // Cerrar sesión
 export async function signOut(): Promise<{ success: boolean; error?: string }> {
-  const { error } = await supabase.auth.signOut();
-  if (error) return { success: false, error: error.message };
-  return { success: true };
+  if (!isSupabaseConfigured) return { success: false, error: MISSING_CONFIG_ERROR };
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Sign out failed',
+    };
+  }
 }
 
 // Obtener sesión actual (para auto-login al abrir la app)

@@ -35,7 +35,7 @@ interface AuthState {
   signUp: (email: string, password: string) => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
-  saveProfile: (firstName: string, lastName: string, journalName: string) => Promise<boolean>;
+  saveProfile: (firstName: string, lastName: string, journalName: string, accountOriginCapital?: number, journalStartCapital?: number) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -165,26 +165,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  saveProfile: async (firstName, lastName, journalName) => {
+  saveProfile: async (firstName, lastName, journalName, accountOriginCapital, journalStartCapital) => {
     const userId = get().user?.id;
     if (!userId) {
       set({ error: 'Not authenticated' });
       return false;
     }
 
-    set({ isLoading: true, error: null });
-    const result = await profileService.upsertProfile(userId, firstName, lastName, journalName);
+    // Don't touch global isLoading — that flag is reserved for initialize()
+    // and controls the app-level loading screen in App.tsx.
+    set({ error: null });
+    const result = await profileService.upsertProfile(userId, firstName, lastName, journalName, accountOriginCapital, journalStartCapital);
     if (result.success) {
       const profile = result.profile ?? null;
-      set({
-        profile,
-        hasCompletedProfile: isProfileComplete(profile),
-        isLoading: false,
-      });
+      set({ profile, hasCompletedProfile: isProfileComplete(profile) });
       return true;
     }
 
-    set({ error: result.error ?? 'Failed to save profile', isLoading: false });
+    set({ error: result.error ?? 'Failed to save profile' });
     return false;
   },
 
@@ -209,7 +207,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // noop
       }
     }
-    await authService.signOut();
+    const result = await authService.signOut();
+    if (!result.success && result.error) {
+      console.warn('[Auth] signOut warning:', result.error);
+    }
     set({
       user: null,
       session: null,

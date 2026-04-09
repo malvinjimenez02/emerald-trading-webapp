@@ -20,7 +20,7 @@ const slides: WalkthroughSlide[] = [
   },
   {
     title: 'Cambia de Journal - Cambia de contexto',
-    description: 'Add trades with structured fields, screenshots, and notes to improve review quality.',
+    description: 'Sigue tu progreso por Journals. Mide cada paso de tu progreso de forma independiente y descubre cuáles son tus fortalezas y debilidades.',
     imageSrc: '/SLIDE3.png',
   },
 ];
@@ -29,6 +29,8 @@ interface DashboardWalkthroughProps {
   open: boolean;
   onClose: () => void;
 }
+
+const AUTO_ADVANCE_MS = 4500;
 
 export const DashboardWalkthrough: React.FC<DashboardWalkthroughProps> = ({ open, onClose }) => {
   const [index, setIndex] = useState(0);
@@ -50,6 +52,14 @@ export const DashboardWalkthrough: React.FC<DashboardWalkthroughProps> = ({ open
 
   const activeSlide = useMemo(() => slides[index], [index]);
   const isLast = index === slides.length - 1;
+
+  useEffect(() => {
+    if (!open || isLast) return;
+    const timer = window.setTimeout(() => {
+      setIndex((prev) => Math.min(prev + 1, slides.length - 1));
+    }, AUTO_ADVANCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, index, isLast]);
 
   if (!open) return null;
 

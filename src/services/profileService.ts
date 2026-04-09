@@ -5,6 +5,8 @@ export interface UserProfile {
   first_name: string;
   last_name: string;
   journal_name: string;
+  account_origin_capital: number | null;
+  journal_start_capital: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +40,14 @@ export async function getProfile(userId: string): Promise<ProfileResult> {
   }
 }
 
-export async function upsertProfile(userId: string, firstName: string, lastName: string, journalName: string): Promise<ProfileResult> {
+export async function upsertProfile(
+  userId: string,
+  firstName: string,
+  lastName: string,
+  journalName: string,
+  accountOriginCapital?: number,
+  journalStartCapital?: number,
+): Promise<ProfileResult> {
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -48,6 +57,8 @@ export async function upsertProfile(userId: string, firstName: string, lastName:
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           journal_name: journalName.trim(),
+          ...(accountOriginCapital !== undefined && { account_origin_capital: accountOriginCapital }),
+          ...(journalStartCapital !== undefined && { journal_start_capital: journalStartCapital }),
         },
         { onConflict: 'user_id' }
       )
