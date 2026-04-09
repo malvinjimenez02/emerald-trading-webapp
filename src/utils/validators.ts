@@ -46,7 +46,8 @@ export function validateName(name: string, field = 'Name'): { valid: boolean; me
   const clean = name.trim();
   if (clean.length === 0) return { valid: false, message: `${field} is required` };
   if (clean.length > 50) return { valid: false, message: `${field} must be 50 characters or less` };
-  if (!/^[\p{L}\s'\-]+$/u.test(clean)) return { valid: false, message: `${field} contains invalid characters` };
+  // Avoid Unicode property escapes (`\p{L}`) so older JS runtimes don't crash during module parse.
+  if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/.test(clean)) return { valid: false, message: `${field} contains invalid characters` };
   return { valid: true };
 }
 
