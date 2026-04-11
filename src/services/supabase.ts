@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../types/database';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -15,14 +16,14 @@ if (!isSupabaseConfigured) {
 
 declare global {
   interface Window {
-    __supabaseClient?: ReturnType<typeof createClient>;
+    __supabaseClient?: ReturnType<typeof createClient<Database>>;
   }
 }
 
 let client = window.__supabaseClient;
 
 if (!client) {
-  client = createClient(
+  client = createClient<Database>(
     SUPABASE_URL ?? 'https://placeholder.supabase.co',
     SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
     {
