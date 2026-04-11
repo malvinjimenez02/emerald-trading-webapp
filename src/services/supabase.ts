@@ -13,7 +13,44 @@ if (!isSupabaseConfigured) {
   );
 }
 
-export const supabase = createClient(
-  SUPABASE_URL ?? 'https://placeholder.supabase.co',
-  SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
-);
+declare global {
+  interface Window {
+    __supabaseClient?: ReturnType<typeof createClient>;
+  }
+}
+
+let client = window.__supabaseClient;
+
+if (!client) {
+  client = createClient(
+    SUPABASE_URL ?? 'https://placeholder.supabase.co',
+    SUPABASE_ANON_KEY ?? 'placeholder-anon-key',
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        // Abort hung auth/storage requests after 10s to prevent getSession() from blocking all writes
+        fetch: (input, init) => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10_000);
+          return fetch(input, { ...init, signal: controller.signal }).finally(() =>
+            clearTimeout(timer)
+          );
+        },
+      },
+    }
+  );
+  window.__supabaseClient = client;
+}
+
+// Clear cached client on HMR reload to prevent GoTrueClient lock corruption
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    delete window.__supabaseClient;
+  });
+}
+
+export const supabase = client;

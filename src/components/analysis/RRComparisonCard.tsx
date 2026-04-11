@@ -53,7 +53,7 @@ export const RRComparisonCard: React.FC<Props> = ({ trades }) => {
     t.exitPrice  != null &&
     t.entryPrice != null &&
     t.stopLoss   != null &&
-    (t.result === TradeResult.Win || t.result === TradeResult.Loss),
+    t.result === TradeResult.Win,
   ).length;
 
   // ── Empty state ────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ export const RRComparisonCard: React.FC<Props> = ({ trades }) => {
 
       {/* ── Footer ── */}
       <p style={{ fontSize: 10, color: '#505866', marginTop: 8, marginBottom: 0 }}>
-        Calculado sobre {validTrades} trades con Take Profit registrado
+        Mediana de {validTrades} trades ganadores con Take Profit registrado
       </p>
 
     </div>

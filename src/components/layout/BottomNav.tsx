@@ -9,7 +9,7 @@ export const BottomNav: React.FC = () => {
   return (
     <>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-surface border-t border-divider h-16 px-2">
-        <div className="flex items-end justify-around h-full pb-2">
+        <div className="flex items-center justify-around h-full">
           <NavLink
             to="/dashboard"
             className={({ isActive }) =>

@@ -246,37 +246,87 @@ export const useTradeStore = create<TradeState>((set, get) => ({
 
   addTrade: async (form, journalId) => {
     const userId = useAuthStore.getState().user?.id;
+    const accessToken = useAuthStore.getState().session?.access_token;
+    if (!accessToken) throw new Error('No active session');
+
     const trade = buildTradeFromForm(form, journalId, userId);
+    const row = mapToSupabase(trade, journalId, userId!);
 
-    const { error } = await supabase
-      .from('trades')
-      .insert(mapToSupabase(trade, journalId, userId!));
+    // Bypass GoTrueClient (which can deadlock on token refresh) using direct fetch
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    const res = await fetch(`${supabaseUrl}/rest/v1/trades`, {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(row),
+    });
 
-    if (error) {
-      console.error('[useTradeStore] addTrade error:', error.message);
+    if (!res.ok) {
+      const body = await res.text().catch(() => res.statusText);
+      const error = new Error(`Insert failed ${res.status}: ${body}`);
+      console.error('[useTradeStore] addTrade error:', body);
       throw error;
     }
 
     const trades = [trade, ...get().trades];
-    const config = await getJournalConfig(journalId);
-    set({ trades, metrics: calculateMetrics(trades, config) });
+    // Keep save path fast; refresh metrics with best-effort config in background.
+    const fallbackConfig: AccountConfig = {
+      journalName: 'Journal',
+      initialCapital: 10_000,
+      riskPerTrade: 100,
+      currency: 'USD',
+    };
+    set({ trades, metrics: calculateMetrics(trades, fallbackConfig) });
+    void (async () => {
+      try {
+        const config = await getJournalConfig(journalId);
+        set({ metrics: calculateMetrics(get().trades, config) });
+      } catch (err) {
+        console.warn('[useTradeStore] addTrade metrics refresh skipped:', err);
+      }
+    })();
     return trade;
   },
 
   updateTrade: async (id, updates) => {
-    const { error } = await supabase
-      .from('trades')
-      .update(mapUpdatesToSupabase(updates))
-      .eq('id', id);
+    const accessToken = useAuthStore.getState().session?.access_token;
+    if (!accessToken) throw new Error('No active session');
 
-    if (error) {
-      console.error('[useTradeStore] updateTrade error:', error.message);
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    const res = await fetch(`${supabaseUrl}/rest/v1/trades?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(mapUpdatesToSupabase(updates)),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => res.statusText);
+      const error = new Error(`Update failed ${res.status}: ${body}`);
+      console.error('[useTradeStore] updateTrade error:', body);
       throw error;
     }
 
-    // Refetch to stay consistent with server state
+    // Optimistic update: reflect changes immediately so the UI doesn't wait
+    // for the background loadTrades refetch.
+    const optimisticTrades = get().trades.map(t =>
+      t.id === id ? { ...t, ...updates } : t
+    );
+    set({ trades: optimisticTrades });
+
+    // Refetch in background to get authoritative data from DB.
     const journalId = get().activeJournalId;
-    if (journalId) await get().loadTrades(journalId);
+    if (journalId) void get().loadTrades(journalId);
   },
 
   deleteTrade: async (id) => {

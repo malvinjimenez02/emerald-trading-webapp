@@ -143,23 +143,46 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
       const ext = file.name.split('.').pop() ?? 'png';
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      const { error } = await supabase.storage
-        .from('screenshots')
-        .upload(path, file, { upsert: false });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      const accessToken = useAuthStore.getState().session?.access_token;
 
-      if (error) throw error;
+      // Use direct fetch to bypass the global 10s timeout on the supabase client
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 120_000);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(path);
+      const res = await fetch(
+        `${supabaseUrl}/storage/v1/object/screenshots/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${accessToken ?? supabaseKey}`,
+            'Content-Type': file.type || 'image/png',
+            'x-upsert': 'false',
+          },
+          body: file,
+          signal: controller.signal,
+        }
+      ).finally(() => clearTimeout(timer));
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => res.statusText);
+        throw new Error(`Upload failed ${res.status}: ${body}`);
+      }
+
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${path}`;
 
       URL.revokeObjectURL(localUrl);
       setScreenshotPreview(publicUrl);
       set('screenshotUri', publicUrl);
     } catch (err) {
       console.error('[TradeForm] screenshot upload failed:', err);
-      set('screenshotUri', localUrl);
-      setErrors(prev => ({ ...prev, _screenshot: 'Upload failed — screenshot saved locally only' }));
+      URL.revokeObjectURL(localUrl);
+      setScreenshotPreview(null);
+      set('screenshotUri', '');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setErrors(prev => ({ ...prev, _screenshot: 'Error al subir el screenshot — intenta de nuevo' }));
     } finally {
       setUploading(false);
     }
@@ -247,11 +270,23 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
   const handleSubmit = async () => {
     if (!validate()) return;
     if (!activeJournal) return;
+    if (saving) return; // Prevent double submissions
 
     setSaving(true);
+    console.log('1. Iniciando guardado...');
+    
+    // Auto-timeout simple para capturar cualquier cuelgue
+    const timeoutMs = 45000;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Save timed out')), timeoutMs);
+    });
+
     try {
       if (isEditMode && tradeId) {
-        await updateTrade(tradeId, {
+        console.log('2. Ejecutando updateTrade...');
+        const updateTask = updateTrade(tradeId, {
           assetName: form.assetName,
           direction: form.direction,
           entryPrice: parsePrice(form.entryPrice) || 0,
@@ -266,9 +301,18 @@ export const TradeForm: React.FC<TradeFormProps> = ({ onClose, tradeId, initialD
           entryDate: toISO(form.entryDate, form.entryTime),
           closeDate: toISO(form.closeDate, form.closeTime),
         });
+        
+        await Promise.race([updateTask, timeoutPromise]);
+        console.log('4. updateTrade completado exitosamente.');
       } else {
-        await addTrade(form, activeJournal.id);
+        console.log('2. Ejecutando addTrade...');
+        const addTask = addTrade(form, activeJournal.id);
+        await Promise.race([addTask, timeoutPromise]);
+        console.log('4. addTrade completado exitosamente.');
       }
+      
+      clearTimeout(timeoutId);
+      console.log('5. Cerrando el modal...');
       onClose();
     } catch (err) {
       console.error('Failed to save trade:', err);

@@ -46,7 +46,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       {isLoading ? (
         <div className="h-9 w-32 bg-bg-secondary rounded-lg animate-pulse mt-2" />
       ) : (
-        <p className={`text-3xl font-bold mt-2 tabular-nums ${valueColorMap[valueColor]}`}>
+        <p className={`text-2xl sm:text-3xl font-bold mt-2 tabular-nums truncate ${valueColorMap[valueColor]}`}>
           {value}
         </p>
       )}

@@ -377,19 +377,19 @@ export function calculateExpectancyTrend(
 }
 
 export function calculateRRComparison(trades: Trade[]): RRComparison | null {
-  const validTradesList = trades.filter(t => 
+  const validTradesList = trades.filter(t =>
     t.status === TradeStatus.Closed &&
     t.takeProfit != null &&
     t.exitPrice != null &&
     t.entryPrice != null &&
     t.stopLoss != null &&
-    (t.result === TradeResult.Win || t.result === TradeResult.Loss)
+    t.result === TradeResult.Win
   );
 
   if (validTradesList.length < 3) return null;
 
-  let totalRRPlanned = 0;
-  let totalRRExecuted = 0;
+  const rrPlannedList: number[] = [];
+  const rrExecutedList: number[] = [];
 
   for (const t of validTradesList) {
     const isLong = t.direction === TradeDirection.Long;
@@ -404,12 +404,22 @@ export function calculateRRComparison(trades: Trade[]): RRComparison | null {
       ? (t.exitPrice! - t.entryPrice) / risk
       : (t.entryPrice - t.exitPrice!) / risk;
 
-    totalRRPlanned += rrPlanned;
-    totalRRExecuted += rrExecuted;
+    rrPlannedList.push(rrPlanned);
+    rrExecutedList.push(rrExecuted);
   }
 
-  const avgRRPlanned = totalRRPlanned / validTradesList.length;
-  const avgRRExecuted = totalRRExecuted / validTradesList.length;
+  if (rrPlannedList.length < 3) return null;
+
+  const median = (arr: number[]) => {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  const avgRRPlanned = median(rrPlannedList);
+  const avgRRExecuted = median(rrExecutedList);
   const executionRatio = (avgRRExecuted / avgRRPlanned) * 100;
 
   return {
