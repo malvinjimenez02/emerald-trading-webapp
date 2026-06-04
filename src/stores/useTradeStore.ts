@@ -43,6 +43,20 @@ interface TradeRow {
   close_date: string | null;
   created_at: string;
   closed_at: string | null;
+  instrument_type: string;
+  option_type: string | null;
+  strike: number | null;
+  expiration_date: string | null;
+  contracts: number | null;
+  premium_entry: number | null;
+  premium_exit: number | null;
+  stop_loss_pct: number | null;
+  strategy: string | null;
+  close_type: string | null;
+  delta_entry: number | null;
+  theta_entry: number | null;
+  iv_entry: number | null;
+  dte_entry: number | null;
 }
 
 // ─── Mapper helpers ───────────────────────────────────────────────────────────
@@ -67,6 +81,23 @@ function mapFromSupabase(row: TradeRow): Trade {
     createdAt: row.created_at,
     closedAt: row.closed_at ?? undefined,
     synced: true,
+    // Options fields
+    instrumentType: (row.instrument_type as import('../types/trade').InstrumentType) ?? 'spot_futures',
+    optionType: (row.option_type as import('../types/trade').OptionType) ?? undefined,
+    strike: row.strike ?? undefined,
+    expirationDate: row.expiration_date ?? undefined,
+    contracts: row.contracts ?? undefined,
+    premiumEntry: row.premium_entry ?? undefined,
+    premiumExit: row.premium_exit ?? undefined,
+    stopLossPct: row.stop_loss_pct ?? undefined,
+    strategy: (row.strategy as import('../types/trade').OptionStrategy) ?? undefined,
+    closeType: (row.close_type as import('../types/trade').OptionCloseType) ?? undefined,
+    greeks: (row.delta_entry || row.theta_entry || row.iv_entry || row.dte_entry) ? {
+      delta: row.delta_entry ?? undefined,
+      theta: row.theta_entry ?? undefined,
+      iv: row.iv_entry ?? undefined,
+      dte: row.dte_entry ?? undefined,
+    } : undefined,
   };
 }
 
@@ -95,26 +126,56 @@ function mapToSupabase(
     close_date: trade.closeDate ?? null,
     created_at: trade.createdAt,
     closed_at: trade.closedAt ?? null,
+    instrument_type: trade.instrumentType ?? 'spot_futures',
+    option_type: trade.optionType ?? null,
+    strike: trade.strike ?? null,
+    expiration_date: trade.expirationDate ?? null,
+    contracts: trade.contracts ?? null,
+    premium_entry: trade.premiumEntry ?? null,
+    premium_exit: trade.premiumExit ?? null,
+    stop_loss_pct: trade.stopLossPct ?? null,
+    strategy: trade.strategy ?? null,
+    close_type: trade.closeType ?? null,
+    delta_entry: trade.greeks?.delta ?? null,
+    theta_entry: trade.greeks?.theta ?? null,
+    iv_entry: trade.greeks?.iv ?? null,
+    dte_entry: trade.greeks?.dte ?? null,
   };
 }
 
 function mapUpdatesToSupabase(updates: Partial<Trade>): Partial<TradeRow> {
   const row: Partial<TradeRow> = {};
-  if (updates.assetName !== undefined)    row.asset_name     = updates.assetName;
-  if (updates.direction !== undefined)    row.direction      = updates.direction;
-  if (updates.entryPrice !== undefined)   row.entry_price    = updates.entryPrice;
-  if (updates.stopLoss !== undefined)     row.stop_loss      = updates.stopLoss;
-  if (updates.takeProfit !== undefined)   row.take_profit    = updates.takeProfit ?? null;
-  if (updates.exitPrice !== undefined)    row.exit_price     = updates.exitPrice ?? null;
-  if (updates.result !== undefined)       row.result         = updates.result;
-  if (updates.rValue !== undefined)       row.r_value        = updates.rValue ?? null;
-  if (updates.pnlAmount !== undefined)    row.pnl_amount     = updates.pnlAmount ?? null;
-  if (updates.status !== undefined)       row.status         = updates.status;
-  if (updates.notes !== undefined)        row.notes          = updates.notes ?? null;
-  if (updates.screenshotUri !== undefined) row.screenshot_uri = updates.screenshotUri ?? null;
-  if (updates.entryDate !== undefined)    row.entry_date     = updates.entryDate ?? null;
-  if (updates.closeDate !== undefined)    row.close_date     = updates.closeDate ?? null;
-  if (updates.closedAt !== undefined)     row.closed_at      = updates.closedAt ?? null;
+  if (updates.assetName !== undefined)      row.asset_name      = updates.assetName;
+  if (updates.direction !== undefined)      row.direction       = updates.direction;
+  if (updates.entryPrice !== undefined)     row.entry_price     = updates.entryPrice;
+  if (updates.stopLoss !== undefined)       row.stop_loss       = updates.stopLoss;
+  if (updates.takeProfit !== undefined)     row.take_profit     = updates.takeProfit ?? null;
+  if (updates.exitPrice !== undefined)      row.exit_price      = updates.exitPrice ?? null;
+  if (updates.result !== undefined)         row.result          = updates.result;
+  if (updates.rValue !== undefined)         row.r_value         = updates.rValue ?? null;
+  if (updates.pnlAmount !== undefined)      row.pnl_amount      = updates.pnlAmount ?? null;
+  if (updates.status !== undefined)         row.status          = updates.status;
+  if (updates.notes !== undefined)          row.notes           = updates.notes ?? null;
+  if (updates.screenshotUri !== undefined)  row.screenshot_uri  = updates.screenshotUri ?? null;
+  if (updates.entryDate !== undefined)      row.entry_date      = updates.entryDate ?? null;
+  if (updates.closeDate !== undefined)      row.close_date      = updates.closeDate ?? null;
+  if (updates.closedAt !== undefined)       row.closed_at       = updates.closedAt ?? null;
+  if (updates.instrumentType !== undefined) row.instrument_type = updates.instrumentType;
+  if (updates.optionType !== undefined)     row.option_type     = updates.optionType ?? null;
+  if (updates.strike !== undefined)         row.strike          = updates.strike ?? null;
+  if (updates.expirationDate !== undefined) row.expiration_date = updates.expirationDate ?? null;
+  if (updates.contracts !== undefined)      row.contracts       = updates.contracts ?? null;
+  if (updates.premiumEntry !== undefined)   row.premium_entry   = updates.premiumEntry ?? null;
+  if (updates.premiumExit !== undefined)    row.premium_exit    = updates.premiumExit ?? null;
+  if (updates.stopLossPct !== undefined)    row.stop_loss_pct   = updates.stopLossPct ?? null;
+  if (updates.strategy !== undefined)       row.strategy        = updates.strategy ?? null;
+  if (updates.closeType !== undefined)      row.close_type      = updates.closeType ?? null;
+  if (updates.greeks !== undefined) {
+    row.delta_entry = updates.greeks?.delta ?? null;
+    row.theta_entry = updates.greeks?.theta ?? null;
+    row.iv_entry    = updates.greeks?.iv    ?? null;
+    row.dte_entry   = updates.greeks?.dte   ?? null;
+  }
   return row;
 }
 
@@ -123,24 +184,79 @@ function buildTradeFromForm(
   _journalId: string,
   _userId: string | undefined
 ): Trade {
-  const entryPrice = parsePrice(form.entryPrice) || 0;
-  const stopLoss   = parsePrice(form.stopLoss) || 0;
-  const takeProfit = parsePrice(form.takeProfit);
-  const exitPrice  = parsePrice(form.exitPrice);
-  const pnlAmount  = parsePrice(form.pnlAmount);
-
   const isClosed = form.result !== TradeResult.Open;
-
   const entryDateISO = combineDatetime(form.entryDate, form.entryTime);
   const closeDateISO = isClosed ? combineDatetime(form.closeDate, form.closeTime) : null;
+  const pnlAmount = parsePrice(form.pnlAmount);
+  const takeProfit = parsePrice(form.takeProfit);
 
-  // Prefer geometry-based R (exit price) over PnL-based estimation
+  // ── Options path ────────────────────────────────────────────────────────
+  if (form.instrumentType === 'options') {
+    const pe = parsePrice(form.premiumEntry) || 0;
+    const px = parsePrice(form.premiumExit);
+    const pct = parsePrice(form.stopLossPct);
+    const numContracts = parseInt(form.contracts) || 1;
+
+    // Compute stop price: % of premium or manual field
+    const stopPrice = pct && pct > 0 && pct < 100
+      ? pe * (1 - pct / 100)
+      : (parsePrice(form.stopLoss) || pe * 0.5);
+
+    let rValue: number | undefined;
+    const riskPerShare = pe - stopPrice;
+    if (px !== null && riskPerShare > 0) {
+      rValue = Math.round(((px - pe) / riskPerShare) * 100) / 100;
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      assetName: form.assetName,
+      direction: form.direction,
+      entryPrice: pe,
+      stopLoss: stopPrice,
+      takeProfit: takeProfit ?? undefined,
+      exitPrice: px ?? undefined,
+      result: form.result,
+      rValue,
+      pnlAmount: pnlAmount ?? undefined,
+      status: isClosed ? TradeStatus.Closed : TradeStatus.Open,
+      notes: form.notes || undefined,
+      screenshotUri: form.screenshotUri || undefined,
+      entryDate: entryDateISO,
+      closeDate: closeDateISO,
+      createdAt: new Date().toISOString(),
+      closedAt: isClosed ? new Date().toISOString() : undefined,
+      synced: true,
+      instrumentType: 'options',
+      optionType: form.optionType || undefined,
+      strike: form.strike ? parseFloat(form.strike) : undefined,
+      expirationDate: form.expirationDate || undefined,
+      contracts: numContracts,
+      premiumEntry: pe,
+      premiumExit: px ?? undefined,
+      stopLossPct: pct ?? undefined,
+      strategy: form.strategy || undefined,
+      closeType: form.closeType || undefined,
+      greeks: (form.deltaEntry || form.thetaEntry || form.ivEntry || form.dteEntry) ? {
+        delta: parsePrice(form.deltaEntry) ?? undefined,
+        theta: parsePrice(form.thetaEntry) ?? undefined,
+        iv: parsePrice(form.ivEntry) ?? undefined,
+        dte: form.dteEntry ? parseInt(form.dteEntry) : undefined,
+      } : undefined,
+    };
+  }
+
+  // ── Spot / Futures path ──────────────────────────────────────────────────
+  const entryPrice = parsePrice(form.entryPrice) || 0;
+  const stopLoss   = parsePrice(form.stopLoss) || 0;
+  const exitPrice  = parsePrice(form.exitPrice);
+
   let rValue: number | undefined;
   if (exitPrice !== null && !isNaN(exitPrice)) {
     const computed = calculateR(form.direction, entryPrice!, exitPrice!, stopLoss!);
     if (computed !== null) rValue = computed;
   } else if (isClosed && pnlAmount !== null && !isNaN(pnlAmount)) {
-    const riskPerTrade = 100; // default; overridden by journal config in metrics
+    const riskPerTrade = 100;
     rValue = form.result === TradeResult.Win
       ? Math.abs(pnlAmount!) / riskPerTrade
       : -(Math.abs(pnlAmount!) / riskPerTrade);
@@ -165,6 +281,7 @@ function buildTradeFromForm(
     createdAt: new Date().toISOString(),
     closedAt: isClosed ? new Date().toISOString() : undefined,
     synced: true,
+    instrumentType: 'spot_futures',
   };
 }
 

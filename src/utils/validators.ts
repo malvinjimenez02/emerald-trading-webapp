@@ -73,6 +73,33 @@ export function validateTradeForm(input: Partial<TradeFormData>): ValidationResu
     errors.direction = 'Direction is required';
   }
 
+  // ── Options validation ────────────────────────────────────────────────────
+  if (input.instrumentType === 'options') {
+    if (!input.optionType) {
+      errors.optionType = 'Selecciona Call o Put';
+    }
+    const strike = input.strike ? cleanParse(input.strike) : NaN;
+    if (isNaN(strike) || strike <= 0) {
+      errors.strike = 'El strike es requerido';
+    }
+    if (!input.expirationDate) {
+      errors.expirationDate = 'La fecha de expiración es requerida';
+    }
+    if (input.expirationDate && input.entryDate && input.expirationDate < input.entryDate) {
+      errors.expirationDate = 'La expiración debe ser posterior a la entrada';
+    }
+    const contracts = input.contracts ? parseInt(input.contracts) : NaN;
+    if (isNaN(contracts) || contracts < 1) {
+      errors.contracts = 'Mínimo 1 contrato';
+    }
+    const premiumEntry = cleanParse(input.premiumEntry);
+    if (isNaN(premiumEntry) || premiumEntry <= 0) {
+      errors.premiumEntry = 'El premium de entrada es requerido';
+    }
+    return Object.keys(errors).length === 0 ? { valid: true } : { valid: false, errors };
+  }
+
+  // ── Spot / Futures validation ─────────────────────────────────────────────
   const entry = cleanParse(input.entryPrice);
   const sl = cleanParse(input.stopLoss);
 

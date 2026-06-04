@@ -40,6 +40,7 @@ function fmtPrice(val: number): string {
 function tradeToFormData(t: Trade): TradeFormData {
   const entry = splitISODatetime(t.entryDate);
   const close = splitISODatetime(t.closeDate ?? t.closedAt);
+  const isOptions = t.instrumentType === 'options';
   return {
     assetName:    t.assetName,
     direction:    t.direction,
@@ -47,14 +48,28 @@ function tradeToFormData(t: Trade): TradeFormData {
     entryTime:    entry.time,
     closeDate:    close.date,
     closeTime:    close.time,
-    entryPrice:   fmtPrice(t.entryPrice),
+    entryPrice:   isOptions ? '' : fmtPrice(t.entryPrice),
     stopLoss:     fmtPrice(t.stopLoss),
     takeProfit:   t.takeProfit != null ? fmtPrice(t.takeProfit) : '',
-    exitPrice:    t.exitPrice != null ? fmtPrice(t.exitPrice) : '',
+    exitPrice:    !isOptions && t.exitPrice != null ? fmtPrice(t.exitPrice) : '',
     result:       t.result,
     pnlAmount:    t.pnlAmount != null ? String(t.pnlAmount) : '',
     notes:        t.notes ?? '',
     screenshotUri: t.screenshotUri ?? '',
+    instrumentType: t.instrumentType ?? 'spot_futures',
+    optionType: t.optionType ?? '',
+    strike: t.strike != null ? fmtPrice(t.strike) : '',
+    expirationDate: t.expirationDate ?? '',
+    contracts: t.contracts != null ? String(t.contracts) : '1',
+    premiumEntry: t.premiumEntry != null ? fmtPrice(t.premiumEntry) : (isOptions ? fmtPrice(t.entryPrice) : ''),
+    premiumExit: t.premiumExit != null ? fmtPrice(t.premiumExit) : (isOptions && t.exitPrice != null ? fmtPrice(t.exitPrice) : ''),
+    stopLossPct: t.stopLossPct != null ? String(t.stopLossPct) : '50',
+    strategy: t.strategy ?? '',
+    closeType: t.closeType ?? '',
+    deltaEntry: t.greeks?.delta != null ? String(t.greeks.delta) : '',
+    thetaEntry: t.greeks?.theta != null ? String(t.greeks.theta) : '',
+    ivEntry: t.greeks?.iv != null ? String(t.greeks.iv) : '',
+    dteEntry: t.greeks?.dte != null ? String(t.greeks.dte) : '',
   };
 }
 
@@ -158,6 +173,22 @@ export const TradeDetailPage: React.FC = () => {
         createdAt:    d.created_at as string,
         closedAt:     d.closed_at as string ?? undefined,
         synced:       true,
+        instrumentType: (d.instrument_type as Trade['instrumentType']) ?? 'spot_futures',
+        optionType: (d.option_type as Trade['optionType']) ?? undefined,
+        strike: d.strike as number ?? undefined,
+        expirationDate: d.expiration_date as string ?? undefined,
+        contracts: d.contracts as number ?? undefined,
+        premiumEntry: d.premium_entry as number ?? undefined,
+        premiumExit: d.premium_exit as number ?? undefined,
+        stopLossPct: d.stop_loss_pct as number ?? undefined,
+        strategy: (d.strategy as Trade['strategy']) ?? undefined,
+        closeType: (d.close_type as Trade['closeType']) ?? undefined,
+        greeks: (d.delta_entry || d.theta_entry || d.iv_entry || d.dte_entry) ? {
+          delta: d.delta_entry as number ?? undefined,
+          theta: d.theta_entry as number ?? undefined,
+          iv: d.iv_entry as number ?? undefined,
+          dte: d.dte_entry as number ?? undefined,
+        } : undefined,
       });
     });
   }, [id, trades]);

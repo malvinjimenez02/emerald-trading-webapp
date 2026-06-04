@@ -94,12 +94,14 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({ trade, onConfirm, onCancel 
 // ─── HistoryPage ──────────────────────────────────────────────────────────────
 
 interface Filters {
-  search:    string;
-  direction: '' | TradeDirection;
-  result:    '' | TradeResult;
+  search:         string;
+  direction:      '' | TradeDirection;
+  result:         '' | TradeResult;
+  instrumentType: '' | 'spot_futures' | 'options';
+  optionType:     '' | 'call' | 'put';
 }
 
-const EMPTY_FILTERS: Filters = { search: '', direction: '', result: '' };
+const EMPTY_FILTERS: Filters = { search: '', direction: '', result: '', instrumentType: '', optionType: '' };
 
 export const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -128,6 +130,8 @@ export const HistoryPage: React.FC = () => {
       if (filters.search    && !t.assetName.toLowerCase().includes(filters.search.toLowerCase())) return false;
       if (filters.direction && t.direction !== filters.direction) return false;
       if (filters.result    && t.result    !== filters.result)    return false;
+      if (filters.instrumentType && t.instrumentType !== filters.instrumentType) return false;
+      if (filters.optionType && t.optionType !== filters.optionType) return false;
       return true;
     });
   }, [dateFiltered, filters]);
@@ -138,6 +142,25 @@ export const HistoryPage: React.FC = () => {
     col.accessor('assetName', {
       header: 'Asset',
       cell: info => <span className="font-semibold text-text">{info.getValue()}</span>,
+    }),
+
+    col.display({
+      id: 'instrument',
+      header: 'Instrument',
+      cell: ({ row }) => {
+        const trade = row.original;
+        if (trade.instrumentType !== 'options') {
+          return <span className="text-text-secondary">Spot/Futures</span>;
+        }
+        const optionLabel = trade.optionType ? trade.optionType.toUpperCase() : 'OPTION';
+        return (
+          <span className="text-text-secondary">
+            {optionLabel}
+            {trade.strike != null ? ` ${trade.strike}` : ''}
+            {trade.expirationDate ? ` exp. ${formatDate(trade.expirationDate, 'MMM D')}` : ''}
+          </span>
+        );
+      },
     }),
 
     col.accessor('direction', {
@@ -311,6 +334,36 @@ export const HistoryPage: React.FC = () => {
           <option value={TradeResult.Loss}>Loss</option>
           <option value={TradeResult.Open}>Break Even</option>
         </select>
+
+        {/* Instrument */}
+        <select
+          value={filters.instrumentType}
+          onChange={e => {
+            const instrumentType = e.target.value as Filters['instrumentType'];
+            setFilters(prev => ({
+              ...prev,
+              instrumentType,
+              optionType: instrumentType === 'options' ? prev.optionType : '',
+            }));
+          }}
+          className={selectClass}
+        >
+          <option value="">All Instruments</option>
+          <option value="spot_futures">Spot/Futures</option>
+          <option value="options">Options</option>
+        </select>
+
+        {filters.instrumentType === 'options' && (
+          <select
+            value={filters.optionType}
+            onChange={e => setFilter('optionType', e.target.value as Filters['optionType'])}
+            className={selectClass}
+          >
+            <option value="">All Options</option>
+            <option value="call">Calls</option>
+            <option value="put">Puts</option>
+          </select>
+        )}
 
         {/* Clear local filters */}
         {hasLocalFilters && (
